@@ -1,0 +1,14 @@
+# Caddy 自动申请并续期 HTTPS 证书（域名须已解析到本机，80 / 443 端口可访问）
+{$COURSE2MD_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+	reverse_proxy hub:8765 {
+		# 进度推送（SSE）需要立即转发
+		flush_interval -1
+	}
+}

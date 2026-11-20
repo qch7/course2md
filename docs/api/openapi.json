@@ -1,0 +1,4555 @@
+{
+  "components": {
+    "schemas": {
+      "AgentModelOptions": {
+        "additionalProperties": true,
+        "properties": {
+          "default_model": {
+            "default": "",
+            "title": "Default Model",
+            "type": "string"
+          },
+          "default_provider": {
+            "default": "",
+            "title": "Default Provider",
+            "type": "string"
+          },
+          "providers": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "default": {},
+            "title": "Providers",
+            "type": "object"
+          }
+        },
+        "title": "AgentModelOptions",
+        "type": "object"
+      },
+      "AuthStatus": {
+        "additionalProperties": true,
+        "properties": {
+          "has_users": {
+            "default": true,
+            "title": "Has Users",
+            "type": "boolean"
+          },
+          "mode": {
+            "default": "local",
+            "title": "Mode",
+            "type": "string"
+          },
+          "registration": {
+            "default": "closed",
+            "title": "Registration",
+            "type": "string"
+          }
+        },
+        "title": "AuthStatus",
+        "type": "object"
+      },
+      "ChatMessage": {
+        "additionalProperties": true,
+        "properties": {
+          "html": {
+            "default": "",
+            "title": "Html",
+            "type": "string"
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "title": "ChatMessage",
+        "type": "object"
+      },
+      "ClaimBody": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "lease_seconds": {
+            "default": 60.0,
+            "maximum": 3600.0,
+            "minimum": 5.0,
+            "title": "Lease Seconds",
+            "type": "number"
+          }
+        },
+        "title": "ClaimBody",
+        "type": "object"
+      },
+      "CompleteBody": {
+        "properties": {
+          "files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "任务目录内相对路径 → 内容摘要",
+            "title": "Files",
+            "type": "object"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "output": {
+            "title": "Output"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "CompleteBody",
+        "type": "object"
+      },
+      "Config": {
+        "additionalProperties": true,
+        "properties": {
+          "agent_choices": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "default": {},
+            "title": "Agent Choices",
+            "type": "object"
+          },
+          "agent_default": {
+            "default": "",
+            "title": "Agent Default",
+            "type": "string"
+          },
+          "agent_models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AgentModelOptions"
+            },
+            "default": {},
+            "title": "Agent Models",
+            "type": "object"
+          },
+          "agents": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Agents",
+            "type": "object"
+          },
+          "default_formats": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Formats",
+            "type": "array"
+          },
+          "default_out": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Out"
+          },
+          "delete_video": {
+            "default": true,
+            "title": "Delete Video",
+            "type": "boolean"
+          },
+          "detail": {
+            "default": true,
+            "title": "Detail",
+            "type": "boolean"
+          },
+          "device": {
+            "default": "",
+            "title": "Device",
+            "type": "string"
+          },
+          "devices": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "formats": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "frame_interval": {
+            "default": 5.0,
+            "title": "Frame Interval",
+            "type": "number"
+          },
+          "frame_selector": {
+            "default": "classroom",
+            "title": "Frame Selector",
+            "type": "string"
+          },
+          "frame_selectors": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FrameSelectorInfo"
+            },
+            "title": "Frame Selectors",
+            "type": "array"
+          },
+          "frames": {
+            "default": true,
+            "title": "Frames",
+            "type": "boolean"
+          },
+          "has_llm_key": {
+            "default": false,
+            "title": "Has Llm Key",
+            "type": "boolean"
+          },
+          "llm_base": {
+            "default": "",
+            "title": "Llm Base",
+            "type": "string"
+          },
+          "llm_model": {
+            "default": "",
+            "title": "Llm Model",
+            "type": "string"
+          },
+          "llm_vision": {
+            "default": false,
+            "title": "Llm Vision",
+            "type": "boolean"
+          },
+          "max_images": {
+            "default": 12,
+            "title": "Max Images",
+            "type": "integer"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "proofread": {
+            "default": true,
+            "title": "Proofread",
+            "type": "boolean"
+          },
+          "resolvers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ResolverInfo"
+            },
+            "title": "Resolvers",
+            "type": "array"
+          },
+          "server": {
+            "default": false,
+            "title": "Server",
+            "type": "boolean"
+          },
+          "startup_warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Startup Warnings",
+            "type": "array"
+          },
+          "term_start": {
+            "default": "",
+            "title": "Term Start",
+            "type": "string"
+          }
+        },
+        "title": "Config",
+        "type": "object"
+      },
+      "Course": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "default": "",
+            "title": "Course",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "out_dir": {
+            "default": "",
+            "title": "Out Dir",
+            "type": "string"
+          },
+          "resolver": {
+            "default": "",
+            "title": "Resolver",
+            "type": "string"
+          },
+          "resolver_label": {
+            "default": "",
+            "title": "Resolver Label",
+            "type": "string"
+          },
+          "sessions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            },
+            "title": "Sessions",
+            "type": "array"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "term_source": {
+            "default": "",
+            "title": "Term Source",
+            "type": "string"
+          },
+          "term_start": {
+            "default": "",
+            "title": "Term Start",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": 0.0,
+            "title": "Updated At",
+            "type": "number"
+          },
+          "view_options": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ViewOption"
+            },
+            "title": "View Options",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Course",
+        "type": "object"
+      },
+      "CourseResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "$ref": "#/components/schemas/Course"
+          }
+        },
+        "required": [
+          "course"
+        ],
+        "title": "CourseResponse",
+        "type": "object"
+      },
+      "CoursesResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "courses": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Course"
+            },
+            "title": "Courses",
+            "type": "array"
+          }
+        },
+        "title": "CoursesResponse",
+        "type": "object"
+      },
+      "CreateJobRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "整理后端：dsh、codex、none 或自定义命令",
+            "title": "Agent"
+          },
+          "agent_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Model"
+          },
+          "agent_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Provider"
+          },
+          "ai": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "是否进行 AI 校对与整理",
+            "title": "Ai"
+          },
+          "compute_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Type"
+          },
+          "course": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course"
+          },
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          },
+          "delete_video": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "成功后清理本任务下载的视频",
+            "title": "Delete Video"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "首选详细版笔记",
+            "title": "Detail"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "转写设备：cuda 或 cpu",
+            "title": "Device"
+          },
+          "formats": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "转写输出格式：srt、vtt、txt、md、json",
+            "title": "Formats"
+          },
+          "frame_interval": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "画面采样间隔（秒）",
+            "title": "Frame Interval"
+          },
+          "frame_selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "画面筛选策略：classroom、general 或已安装的插件名",
+            "title": "Frame Selector"
+          },
+          "frames": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "筛选课件画面",
+            "title": "Frames"
+          },
+          "keep_audio": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Audio"
+          },
+          "llm_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "OpenAI 兼容接口地址",
+            "title": "Llm Base"
+          },
+          "llm_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whisper 模型",
+            "title": "Model"
+          },
+          "out_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Dir"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "确认覆盖已有的整理结果",
+            "title": "Overwrite"
+          },
+          "proofread": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proofread"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "session_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "要整理的课次，每个课次一个任务",
+            "title": "Session Ids"
+          },
+          "source": {
+            "default": "",
+            "description": "课程链接或本地路径",
+            "title": "Source",
+            "type": "string"
+          },
+          "term_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term Start"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "views": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "机位编号",
+            "title": "Views"
+          }
+        },
+        "title": "CreateJobRequest",
+        "type": "object"
+      },
+      "CreateJobsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Course"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "jobs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Jobs",
+            "type": "array"
+          }
+        },
+        "title": "CreateJobsResponse",
+        "type": "object"
+      },
+      "Credentials": {
+        "properties": {
+          "password": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string"
+          },
+          "username": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "title": "Credentials",
+        "type": "object"
+      },
+      "ExistingResult": {
+        "additionalProperties": true,
+        "properties": {
+          "complete": {
+            "default": false,
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "path": {
+            "default": "",
+            "title": "Path",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "title": "ExistingResult",
+        "type": "object"
+      },
+      "FailBody": {
+        "properties": {
+          "cancelled": {
+            "default": false,
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "error_type": {
+            "default": "",
+            "title": "Error Type",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "FailBody",
+        "type": "object"
+      },
+      "FileEntry": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "rel": {
+            "default": "",
+            "title": "Rel",
+            "type": "string"
+          },
+          "size": {
+            "default": "",
+            "title": "Size",
+            "type": "string"
+          }
+        },
+        "title": "FileEntry",
+        "type": "object"
+      },
+      "FrameSelectorInfo": {
+        "additionalProperties": true,
+        "properties": {
+          "builtin": {
+            "default": false,
+            "title": "Builtin",
+            "type": "boolean"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "FrameSelectorInfo",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": true,
+        "properties": {
+          "agent": {
+            "default": "",
+            "title": "Agent",
+            "type": "string"
+          },
+          "agent_model": {
+            "default": "",
+            "title": "Agent Model",
+            "type": "string"
+          },
+          "can_chat": {
+            "default": false,
+            "title": "Can Chat",
+            "type": "boolean"
+          },
+          "course": {
+            "default": "",
+            "title": "Course",
+            "type": "string"
+          },
+          "course_id": {
+            "default": "",
+            "title": "Course Id",
+            "type": "string"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "event_offset": {
+            "default": 0,
+            "title": "Event Offset",
+            "type": "integer"
+          },
+          "events": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JobEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "files": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "log_offset": {
+            "default": 0,
+            "title": "Log Offset",
+            "type": "integer"
+          },
+          "logs": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Logs",
+            "type": "array"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "messages": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "out_dir": {
+            "default": "",
+            "title": "Out Dir",
+            "type": "string"
+          },
+          "pending_messages": {
+            "default": 0,
+            "title": "Pending Messages",
+            "type": "integer"
+          },
+          "progress": {
+            "default": 0.0,
+            "title": "Progress",
+            "type": "number"
+          },
+          "revision": {
+            "default": 0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "session_date": {
+            "default": "",
+            "title": "Session Date",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "default": 0.0,
+            "title": "Started At",
+            "type": "number"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "sub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          },
+          "timings": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Timings",
+            "type": "object"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "week": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobEvent": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "seq": {
+            "default": 0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "time": {
+            "default": 0.0,
+            "title": "Time",
+            "type": "number"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "title": "JobEvent",
+        "type": "object"
+      },
+      "JobResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "JobResponse",
+        "type": "object"
+      },
+      "JobsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "jobs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Jobs",
+            "type": "array"
+          }
+        },
+        "title": "JobsResponse",
+        "type": "object"
+      },
+      "LoginResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "token": {
+            "default": "",
+            "title": "Token",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserInfo"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "LoginResponse",
+        "type": "object"
+      },
+      "MessageRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "客户端生成的请求编号，用于去重",
+            "title": "Id"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "提问或修改要求",
+            "title": "Text"
+          }
+        },
+        "title": "MessageRequest",
+        "type": "object"
+      },
+      "NewUser": {
+        "properties": {
+          "password": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string"
+          },
+          "role": {
+            "default": "user",
+            "title": "Role",
+            "type": "string"
+          },
+          "username": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "title": "NewUser",
+        "type": "object"
+      },
+      "NoteVersion": {
+        "additionalProperties": true,
+        "properties": {
+          "created_at": {
+            "default": 0.0,
+            "title": "Created At",
+            "type": "number"
+          },
+          "has_brief": {
+            "default": false,
+            "title": "Has Brief",
+            "type": "boolean"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "NoteVersion",
+        "type": "object"
+      },
+      "NoteVersionText": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "default": "detailed",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "NoteVersionText",
+        "type": "object"
+      },
+      "Ok": {
+        "additionalProperties": true,
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "Ok",
+        "type": "object"
+      },
+      "PasswordChange": {
+        "properties": {
+          "new_password": {
+            "default": "",
+            "maxLength": 256,
+            "title": "New Password",
+            "type": "string"
+          },
+          "old_password": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Old Password",
+            "type": "string"
+          }
+        },
+        "title": "PasswordChange",
+        "type": "object"
+      },
+      "Plugin": {
+        "additionalProperties": true,
+        "properties": {
+          "hint": {
+            "default": "",
+            "title": "Hint",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "default": "",
+            "title": "Origin",
+            "type": "string"
+          },
+          "removable": {
+            "default": false,
+            "title": "Removable",
+            "type": "boolean"
+          },
+          "resolvers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Resolvers",
+            "type": "array"
+          },
+          "version": {
+            "default": "",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "Plugin",
+        "type": "object"
+      },
+      "PluginInstallRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "default": "github",
+            "description": "安装来源：github 或 local",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "description": "GitHub 仓库 HTTPS 链接或本机插件项目/安装包路径",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "PluginInstallRequest",
+        "type": "object"
+      },
+      "PluginsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "can_manage": {
+            "default": false,
+            "title": "Can Manage",
+            "type": "boolean"
+          },
+          "errors": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "plugins": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Plugin"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          }
+        },
+        "title": "PluginsResponse",
+        "type": "object"
+      },
+      "Preview": {
+        "additionalProperties": true,
+        "properties": {
+          "html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "title": "Preview",
+        "type": "object"
+      },
+      "ProgressBody": {
+        "properties": {
+          "fraction": {
+            "default": 0.0,
+            "title": "Fraction",
+            "type": "number"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "sub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          }
+        },
+        "title": "ProgressBody",
+        "type": "object"
+      },
+      "RefreshRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "term_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term Start"
+          }
+        },
+        "title": "RefreshRequest",
+        "type": "object"
+      },
+      "RegisterBody": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "default": "",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "title": "RegisterBody",
+        "type": "object"
+      },
+      "RenewBody": {
+        "properties": {
+          "lease_seconds": {
+            "default": 60.0,
+            "maximum": 3600.0,
+            "minimum": 5.0,
+            "title": "Lease Seconds",
+            "type": "number"
+          }
+        },
+        "title": "RenewBody",
+        "type": "object"
+      },
+      "RerunRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "换用的整理后端",
+            "title": "Agent"
+          },
+          "agent_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Model"
+          },
+          "agent_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Provider"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "from_stage": {
+            "default": "organize",
+            "description": "从哪个阶段重新运行：media、frames、proofread、output、organize",
+            "title": "From Stage",
+            "type": "string"
+          },
+          "llm_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "换用的内置整理 / 校对模型",
+            "title": "Llm Model"
+          }
+        },
+        "title": "RerunRequest",
+        "type": "object"
+      },
+      "ResolveRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "已保存课程的编号，用于更新同一课程",
+            "title": "Course Id"
+          },
+          "out_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "输出根目录，留空使用配置中的默认值",
+            "title": "Out Dir"
+          },
+          "source": {
+            "default": "",
+            "description": "课程链接或本地路径",
+            "title": "Source",
+            "type": "string"
+          },
+          "term_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "学期第 1 周起始日 YYYY-MM-DD",
+            "title": "Term Start"
+          }
+        },
+        "title": "ResolveRequest",
+        "type": "object"
+      },
+      "ResolvedCourse": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "default": "",
+            "title": "Course",
+            "type": "string"
+          },
+          "course_id": {
+            "default": "",
+            "title": "Course Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "out_dir": {
+            "default": "",
+            "title": "Out Dir",
+            "type": "string"
+          },
+          "resolver": {
+            "default": "",
+            "title": "Resolver",
+            "type": "string"
+          },
+          "resolver_label": {
+            "default": "",
+            "title": "Resolver Label",
+            "type": "string"
+          },
+          "sessions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            },
+            "title": "Sessions",
+            "type": "array"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "term_source": {
+            "default": "",
+            "title": "Term Source",
+            "type": "string"
+          },
+          "term_start": {
+            "default": "",
+            "title": "Term Start",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": 0.0,
+            "title": "Updated At",
+            "type": "number"
+          },
+          "view_options": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ViewOption"
+            },
+            "title": "View Options",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ResolvedCourse",
+        "type": "object"
+      },
+      "ResolverInfo": {
+        "additionalProperties": true,
+        "properties": {
+          "hint": {
+            "default": "",
+            "title": "Hint",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "ResolverInfo",
+        "type": "object"
+      },
+      "Session": {
+        "additionalProperties": true,
+        "properties": {
+          "date": {
+            "default": "",
+            "title": "Date",
+            "type": "string"
+          },
+          "existing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExistingResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "folder": {
+            "default": "",
+            "title": "Folder",
+            "type": "string"
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "default": "",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "views": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Views"
+          },
+          "week": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week"
+          }
+        },
+        "title": "Session",
+        "type": "object"
+      },
+      "Task": {
+        "additionalProperties": true,
+        "properties": {
+          "affinity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Affinity"
+          },
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "created_at": {
+            "default": 0.0,
+            "title": "Created At",
+            "type": "number"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "error_type": {
+            "default": "",
+            "title": "Error Type",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "default": "",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/TaskProgress",
+            "default": {
+              "fraction": 0.0,
+              "message": "",
+              "seq": 0,
+              "stage": ""
+            }
+          },
+          "requires": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Requires",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "worker_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Id"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Task",
+        "type": "object"
+      },
+      "TaskProgress": {
+        "additionalProperties": true,
+        "properties": {
+          "fraction": {
+            "default": 0.0,
+            "title": "Fraction",
+            "type": "number"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "seq": {
+            "default": 0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "sub": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          }
+        },
+        "title": "TaskProgress",
+        "type": "object"
+      },
+      "TasksResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "tasks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "title": "TasksResponse",
+        "type": "object"
+      },
+      "TokenRequest": {
+        "properties": {
+          "name": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "TokenRequest",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
+      "UserInfo": {
+        "additionalProperties": true,
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "disabled": {
+            "default": false,
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "default": "user",
+            "title": "Role",
+            "type": "string"
+          },
+          "username": {
+            "default": "",
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UserInfo",
+        "type": "object"
+      },
+      "UserResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserInfo"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "UserUpdate": {
+        "properties": {
+          "disabled": {
+            "title": "Disabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "disabled"
+        ],
+        "title": "UserUpdate",
+        "type": "object"
+      },
+      "UsersResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "users": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/UserInfo"
+            },
+            "title": "Users",
+            "type": "array"
+          }
+        },
+        "title": "UsersResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VersionsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "versions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NoteVersion"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "title": "VersionsResponse",
+        "type": "object"
+      },
+      "ViewOption": {
+        "additionalProperties": true,
+        "properties": {
+          "default": {
+            "default": false,
+            "title": "Default",
+            "type": "boolean"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Id"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "title": "ViewOption",
+        "type": "object"
+      },
+      "Worker": {
+        "additionalProperties": true,
+        "properties": {
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "disabled": {
+            "default": false,
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_seen": {
+            "default": 0.0,
+            "title": "Last Seen",
+            "type": "number"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "online": {
+            "default": false,
+            "title": "Online",
+            "type": "boolean"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "version": {
+            "default": "",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Worker",
+        "type": "object"
+      },
+      "WorkerToken": {
+        "additionalProperties": true,
+        "properties": {
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "shared": {
+            "default": false,
+            "title": "Shared",
+            "type": "boolean"
+          },
+          "token": {
+            "default": "",
+            "title": "Token",
+            "type": "string"
+          },
+          "worker_id": {
+            "title": "Worker Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worker_id"
+        ],
+        "title": "WorkerToken",
+        "type": "object"
+      },
+      "WorkerTokenRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "节点名称，便于在计算服务页识别",
+            "title": "Name",
+            "type": "string"
+          },
+          "personal": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "管理员创建只处理自己任务的个人节点；默认创建共享节点",
+            "title": "Personal"
+          }
+        },
+        "title": "WorkerTokenRequest",
+        "type": "object"
+      },
+      "WorkersResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "workers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Worker"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "title": "WorkersResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "课程回放转 Markdown 笔记的 Hub 接口。所有路径位于 /api/v1 下，进度可通过 SSE 订阅。",
+    "title": "course2md",
+    "version": "v1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "登录，设置会话 Cookie 并返回令牌",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "退出登录",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "当前用户",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "operationId": "change_password_api_v1_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "修改口令",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "注册；第一个用户成为管理员",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/status": {
+      "get": {
+        "operationId": "status_api_v1_auth_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "登录要求与注册是否开放",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/tokens": {
+      "post": {
+        "operationId": "create_token_api_v1_auth_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "生成 API 令牌（供脚本或其它客户端使用），只在本次返回",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/config": {
+      "get": {
+        "operationId": "get_config_api_v1_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Config"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "本机配置、默认值与可选项",
+        "tags": [
+          "配置"
+        ]
+      }
+    },
+    "/api/v1/courses": {
+      "get": {
+        "operationId": "list_courses_api_v1_courses_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoursesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "已保存的课程",
+        "tags": [
+          "课程"
+        ]
+      }
+    },
+    "/api/v1/courses/{course_id}": {
+      "get": {
+        "operationId": "get_course_api_v1_courses__course_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "课程详情与课次状态",
+        "tags": [
+          "课程"
+        ]
+      }
+    },
+    "/api/v1/courses/{course_id}/refresh": {
+      "post": {
+        "operationId": "refresh_course_api_v1_courses__course_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedCourse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "重新解析已保存课程的课次",
+        "tags": [
+          "课程"
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "operationId": "list_jobs_api_v1_jobs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "全部任务",
+        "tags": [
+          "任务"
+        ]
+      },
+      "post": {
+        "operationId": "create_job_api_v1_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateJobsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "已有整理结果，需要 overwrite 确认"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "创建任务（每个课次一个）",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "已读取的日志条数",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": "0",
+              "description": "已读取的日志条数",
+              "title": "Since",
+              "type": "string"
+            }
+          },
+          {
+            "description": "已读取的运行输出序号",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": "0",
+              "description": "已读取的运行输出序号",
+              "title": "After",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "任务状态；since / after 只返回新的日志与运行输出",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/cancel": {
+      "post": {
+        "operationId": "cancel_job_api_v1_jobs__job_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "取消任务",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/events": {
+      "get": {
+        "operationId": "job_events_api_v1_jobs__job_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": "0",
+              "title": "Since",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": "0",
+              "title": "After",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "以 SSE 推送任务状态变化",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/export/anki": {
+      "get": {
+        "operationId": "export_anki_api_v1_jobs__job_id__export_anki_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Anki",
+        "tags": [
+          "导出"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/file": {
+      "get": {
+        "operationId": "job_file_api_v1_jobs__job_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rel",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Rel",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inline",
+            "required": false,
+            "schema": {
+              "default": "0",
+              "title": "Inline",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "下载任务目录中的文件",
+        "tags": [
+          "产物"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/messages": {
+      "post": {
+        "operationId": "send_message_api_v1_jobs__job_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "继续提问或要求修改笔记",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/preview": {
+      "get": {
+        "operationId": "job_preview_api_v1_jobs__job_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rel",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Rel",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "预览文本、Markdown 或图片",
+        "tags": [
+          "产物"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/rerun": {
+      "post": {
+        "operationId": "rerun_job_api_v1_jobs__job_id__rerun_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "从指定阶段重新运行，之前的阶段复用已有结果",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/tasks": {
+      "get": {
+        "operationId": "job_tasks_api_v1_jobs__job_id__tasks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TasksResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "各阶段的执行记录：节点、状态、生成模型",
+        "tags": [
+          "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/versions": {
+      "get": {
+        "operationId": "note_versions_api_v1_jobs__job_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "笔记版本历史",
+        "tags": [
+          "笔记"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/versions/{version}": {
+      "get": {
+        "operationId": "note_version_api_v1_jobs__job_id__versions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "detailed",
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteVersionText"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "某个版本的 Markdown 原文",
+        "tags": [
+          "笔记"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/versions/{version}/restore": {
+      "post": {
+        "operationId": "restore_version_api_v1_jobs__job_id__versions__version__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "恢复到某个版本（另存为新版本）",
+        "tags": [
+          "笔记"
+        ]
+      }
+    },
+    "/api/v1/plugins": {
+      "get": {
+        "operationId": "list_plugins_api_v1_plugins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "已安装的来源解析插件与管理状态",
+        "tags": [
+          "插件"
+        ]
+      },
+      "post": {
+        "operationId": "install_plugin_api_v1_plugins_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginInstallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "从 GitHub 或本机路径安装插件（本地应用）",
+        "tags": [
+          "插件"
+        ]
+      }
+    },
+    "/api/v1/plugins/import": {
+      "post": {
+        "operationId": "import_plugin_api_v1_plugins_import_post",
+        "parameters": [
+          {
+            "description": ".whl、.zip 或 .tar.gz 文件名",
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "description": ".whl、.zip 或 .tar.gz 文件名",
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "contentMediaType": "application/octet-stream",
+                "title": "Content",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "上传插件安装包（本地应用，最大 32 MB）",
+        "tags": [
+          "插件"
+        ]
+      }
+    },
+    "/api/v1/plugins/{name}": {
+      "delete": {
+        "operationId": "delete_plugin_api_v1_plugins__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "卸载来源解析插件（本地应用）",
+        "tags": [
+          "插件"
+        ]
+      }
+    },
+    "/api/v1/resolve": {
+      "post": {
+        "operationId": "resolve_api_v1_resolve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedCourse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "解析来源，列出课次并保存课程",
+        "tags": [
+          "课程"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "list_users_api_v1_users_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "全部用户（管理员）",
+        "tags": [
+          "账号"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_api_v1_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "创建用户（管理员）",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}": {
+      "patch": {
+        "operationId": "update_user_api_v1_users__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "停用或启用用户（管理员）",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/worker/blobs/{digest}": {
+      "head": {
+        "operationId": "blob_exists_api_v1_worker_blobs__digest__head",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "digest",
+            "required": true,
+            "schema": {
+              "title": "Digest",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "检查产物文件是否已上传",
+        "tags": [
+          "计算节点"
+        ]
+      },
+      "put": {
+        "operationId": "upload_blob_api_v1_worker_blobs__digest__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "digest",
+            "required": true,
+            "schema": {
+              "title": "Digest",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Upload Blob Api V1 Worker Blobs  Digest  Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "上传产物文件（按内容摘要校验）",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/claim": {
+      "post": {
+        "operationId": "claim_api_v1_worker_claim_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Claim Api V1 Worker Claim Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "领取一个能力满足的任务；没有任务时 task 为 null",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/heartbeat": {
+      "post": {
+        "operationId": "heartbeat_api_v1_worker_heartbeat_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Heartbeat Api V1 Worker Heartbeat Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "节点在线心跳",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/leave": {
+      "post": {
+        "operationId": "leave_api_v1_worker_leave_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Leave Api V1 Worker Leave Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "节点正常退出",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/register": {
+      "post": {
+        "operationId": "register_api_v1_worker_register_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Register Api V1 Worker Register Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "注册或更新节点能力",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/complete": {
+      "post": {
+        "operationId": "complete_api_v1_worker_tasks__task_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Complete Api V1 Worker Tasks  Task Id  Complete Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "提交输出产物；files 中的文件写回 Hub 任务目录",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/events": {
+      "post": {
+        "operationId": "events_api_v1_worker_tasks__task_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Events Api V1 Worker Tasks  Task Id  Events Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "回报运行输出",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/fail": {
+      "post": {
+        "operationId": "fail_api_v1_worker_tasks__task_id__fail_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FailBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Fail Api V1 Worker Tasks  Task Id  Fail Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "报告失败或已取消",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/files": {
+      "get": {
+        "operationId": "task_file_api_v1_worker_tasks__task_id__files_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rel",
+            "required": true,
+            "schema": {
+              "title": "Rel",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "下载任务目录中的输入文件",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/progress": {
+      "post": {
+        "operationId": "progress_api_v1_worker_tasks__task_id__progress_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Progress Api V1 Worker Tasks  Task Id  Progress Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "回报进度",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/release": {
+      "post": {
+        "operationId": "release_api_v1_worker_tasks__task_id__release_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Release Api V1 Worker Tasks  Task Id  Release Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "节点停机时归还任务，供重启后接续",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/worker/tasks/{task_id}/renew": {
+      "post": {
+        "operationId": "renew_api_v1_worker_tasks__task_id__renew_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenewBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Renew Api V1 Worker Tasks  Task Id  Renew Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "续约；返回是否已请求取消",
+        "tags": [
+          "计算节点"
+        ]
+      }
+    },
+    "/api/v1/workers": {
+      "get": {
+        "operationId": "list_workers_api_v1_workers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "计算节点、在线状态与能力",
+        "tags": [
+          "计算服务"
+        ]
+      },
+      "post": {
+        "operationId": "create_worker_api_v1_workers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerToken"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "创建节点令牌；令牌只在本次返回",
+        "tags": [
+          "计算服务"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}": {
+      "delete": {
+        "operationId": "delete_worker_api_v1_workers__worker_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "永久删除节点记录；默认仅停用。内置节点和仍有未完成任务的节点不能删除",
+            "in": "query",
+            "name": "permanent",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "永久删除节点记录；默认仅停用。内置节点和仍有未完成任务的节点不能删除",
+              "title": "Permanent",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "停用或永久删除节点并作废其令牌",
+        "tags": [
+          "计算服务"
+        ]
+      }
+    }
+  }
+}

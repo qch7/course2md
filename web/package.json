@@ -1,0 +1,40 @@
+{
+  "name": "course2md-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint . && prettier --check src",
+    "format": "prettier --write src",
+    "test": "vitest run",
+    "gen:api": "openapi-typescript ../docs/api/openapi.json -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts"
+  },
+  "dependencies": {
+    "@tanstack/vue-query": "^5.107.1",
+    "markdown-it": "^15.0.3",
+    "openapi-fetch": "^0.17.0",
+    "vue": "^3.5.45",
+    "vue-router": "^5.5.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/markdown-it": "^14.2.0",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "@vue/test-utils": "^2.5.1",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.12.1",
+    "jsdom": "^31.0.1",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.10.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0",
+    "vue-tsc": "^3.3.14"
+  },
+  "packageManager": "pnpm@11.28.5"
+}

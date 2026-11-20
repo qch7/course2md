@@ -1,0 +1,95 @@
+# 服务器部署：Hub + PostgreSQL + Caddy（自动 HTTPS）。
+#   cp .env.example .env   # 填写域名、数据库口令与密钥
+#   docker compose up -d
+# 有 NVIDIA 显卡的服务器可以同时运行计算节点：docker compose --profile gpu up -d
+
+name: course2md
+
+services:
+  hub:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: hub
+      args:
+        EXTRA_PACKAGES: ${COURSE2MD_PLUGINS:-}
+    image: course2md-hub:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      COURSE2MD_DATABASE_URL: postgresql+psycopg://course2md:${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}@db:5432/course2md
+      COURSE2MD_SECRET_KEY: ${COURSE2MD_SECRET_KEY:?请在 .env 中设置 COURSE2MD_SECRET_KEY}
+      # Hub 只在内部网络中被 Caddy 访问，信任其转发头
+      COURSE2MD_TRUSTED_PROXIES: "*"
+    volumes:
+      - hub-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: course2md
+      POSTGRES_DB: course2md
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U course2md -d course2md"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      COURSE2MD_DOMAIN: ${COURSE2MD_DOMAIN:?请在 .env 中设置 COURSE2MD_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - hub
+
+  worker:
+    profiles: ["gpu"]
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: worker
+      args:
+        EXTRA_PACKAGES: ${COURSE2MD_PLUGINS:-}
+    image: course2md-worker:local
+    restart: unless-stopped
+    environment:
+      COURSE2MD_HUB_URL: http://hub:8765
+      COURSE2MD_WORKER_TOKEN: ${COURSE2MD_WORKER_TOKEN:-}
+      COURSE2MD_WORKER_NAME: ${COURSE2MD_WORKER_NAME:-服务器 GPU}
+      COURSE2MD_DEVICE: cuda
+    volumes:
+      - worker-data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      - hub
+
+volumes:
+  hub-data:
+  db-data:
+  caddy-data:
+  caddy-config:
+  worker-data:

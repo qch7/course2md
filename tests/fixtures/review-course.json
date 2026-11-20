@@ -1,0 +1,24 @@
+{
+  "title": "编译原理：左递归",
+  "segments": [
+    {"start": 0, "end": 4, "text": "我们下周开始期中检查。"},
+    {"start": 60, "end": 65, "text": "例题选 B，这个是考试重点。"}
+  ],
+  "lesson": {
+    "overview": "消除左递归与课堂练习。",
+    "topics": [{"title": "直接左递归", "timestamp": "00:01:00", "explanation": "引入新的非终结符。", "key_points": ["保留 ε 候选式。"], "figure_ids": ["f1"]}],
+    "examples": [{"title": "消除左递归", "timestamp": "00:01:00", "question": "给定 `E→E+T|T`，选择正确改写。", "steps": ["识别 `α=+T`。", "写出 `E→TE′`。"], "answer": "选 B，`E′→+TE′|ε`。", "pitfalls": ["不能漏掉 ε。"], "figure_ids": ["f1"], "uncertainty": "选项 A 的末尾不清楚。"}],
+    "teacher_points": [{"evidence_id": "e1", "meaning": "下周开展期中检查。"}, {"evidence_id": "e2", "meaning": "老师强调本题的考试要求。"}],
+    "review_questions": ["为什么需要 ε？"],
+    "uncertainties": ["选项 A 末尾需要回看。"]
+  },
+  "expected": {
+    "terms": ["左递归", "ε", "E→TE′"],
+    "brief_terms": ["左递归", "ε"],
+    "min_examples": 1,
+    "min_steps": 2,
+    "min_figures": 1,
+    "teacher_evidence": ["e1", "e2"],
+    "uncertainties": ["选项 A"]
+  }
+}

@@ -1,0 +1,56 @@
+site_name: course2md
+site_description: 把课程回放变成可以复习的结构化 Markdown 笔记
+repo_url: https://github.com/qch7/course2md
+edit_uri: edit/main/docs/
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: brown
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: 切换到深色
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: brown
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到浅色
+  features:
+    - navigation.sections
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.superfences
+
+nav:
+  - 首页: index.md
+  - 快速开始: getting-started.md
+  - 工作原理: how-it-works.md
+  - 计算节点: workers.md
+  - 笔记导出与同步: exports.md
+  - 服务器部署: deploy.md
+  - 配置项: configuration.md
+  - 插件开发: plugins.md
+  - 架构: architecture.md
+  - 安全与隐私: security.md
+  - 测试与评估: testing.md
+  - 改进路线: roadmap.md
+
+not_in_nav: |
+  api/

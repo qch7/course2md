@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked --extra asr --group docs
+      - run: uv run ruff check src tests scripts
+      - run: uv run ruff format --check src tests scripts
+      - run: uv run mypy
+      - name: 分层约束
+        run: uv run lint-imports
+      - run: uv run python scripts/gen_config.py --check
+      - run: uv run python scripts/export_openapi.py --check
+      - name: 文档站点
+        run: uv run --group docs mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: API 类型与 OpenAPI 一致
+        run: pnpm gen:api && git diff --exit-code src/api/schema.d.ts
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  images:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Hub 镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: hub
+          push: false
+      - name: 计算节点镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: worker
+          push: false
+      - name: Compose 配置
+        working-directory: deploy
+        run: POSTGRES_PASSWORD=x COURSE2MD_SECRET_KEY=y COURSE2MD_DOMAIN=example.com docker compose config --quiet
+
+  postgres:
+    needs: lint
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: course2md
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: course2md_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U course2md -d course2md_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      COURSE2MD_TEST_DATABASE_URL: postgresql+psycopg://course2md:test-password@127.0.0.1:5432/course2md_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --extra server
+      - run: uv run pytest -q tests/test_postgres.py
+
+  test:
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked --extra asr
+      - run: uv run pytest -q

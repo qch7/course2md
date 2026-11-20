@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+        args: [--unsafe]  # mkdocs.yml 使用 !!python 标签
+      - id: end-of-file-fixer
+        exclude: \.(png|jpg)$
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+  - repo: local
+    hooks:
+      - id: import-layers
+        name: 模块分层约束
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        files: ^(src/course2md/.*\.py|pyproject\.toml)$
+      - id: config-generated
+        name: 配置示例与文档已重新生成
+        entry: python scripts/gen_config.py --check
+        language: system
+        pass_filenames: false
+        files: ^(src/course2md/config/|config\.example\.toml|\.env\.example|docs/configuration\.md)
+      - id: openapi-exported
+        name: OpenAPI 文档已重新导出
+        entry: python scripts/export_openapi.py --check
+        language: system
+        pass_filenames: false
+        files: ^(src/course2md/hub/|docs/api/openapi\.json)

@@ -1,0 +1,206 @@
+<script setup lang="ts">
+import { computed, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+
+import type { Course, Job } from "@/api/client";
+import AppIcon from "@/components/AppIcon.vue";
+import BrandMark from "@/components/BrandMark.vue";
+import { isBusy, store } from "@/stores/jobs";
+import { session } from "@/stores/session";
+import { cycleTheme, theme, themeLabels } from "@/stores/theme";
+import { ui } from "@/stores/ui";
+import { agentName, sessionLabel, statusNames } from "@/utils/format";
+
+const route = useRoute();
+const router = useRouter();
+const search = ref("");
+
+function loadFolders(): Record<string, boolean> {
+  try {
+    const stored = JSON.parse(localStorage.getItem("course2md.folders") || "{}");
+    return stored && typeof stored === "object" ? stored : {};
+  } catch {
+    return {};
+  }
+}
+const folders = reactive(loadFolders());
+
+const selectedJob = computed(() => (route.name === "job" ? String(route.params.jobId) : ""));
+const selectedCourse = computed(() =>
+  route.name === "course"
+    ? String(route.params.courseId)
+    : (store.jobs.get(selectedJob.value)?.course_id ?? ""),
+);
+
+interface Group {
+  key: string;
+  course: Pick<Course, "id" | "title"> & Partial<Course>;
+  jobs: Job[];
+}
+
+const groups = computed<Group[]>(() => {
+  const map = new Map<string, Group>();
+  [...store.courses.values()]
+    .sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0))
+    .forEach((course) => map.set(course.id, { key: course.id, course, jobs: [] }));
+  [...store.jobs.values()]
+    .sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0))
+    .forEach((job) => {
+      const key = job.course_id || `legacy:${job.course || "未分类"}`;
+      if (!map.has(key)) map.set(key, { key, course: { id: key, title: job.course || "未分类" }, jobs: [] });
+      map.get(key)!.jobs.push(job);
+    });
+  const filter = search.value.trim().toLowerCase();
+  return [...map.values()].filter((group) => {
+    if (!filter) return true;
+    const text = [
+      group.course.title,
+      group.course.source,
+      ...(group.course.sessions ?? []).map((item) => item.title),
+      ...group.jobs.map((job) => job.title),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return text.includes(filter);
+  });
+});
+
+function expanded(group: Group): boolean {
+  if (group.key in folders) return folders[group.key];
+  return group.key === selectedCourse.value || !selectedJob.value;
+}
+
+function toggle(group: Group): void {
+  folders[group.key] = !expanded(group);
+  try {
+    localStorage.setItem("course2md.folders", JSON.stringify(folders));
+  } catch {
+    /* 隐私模式忽略 */
+  }
+}
+
+function openGroup(group: Group): void {
+  ui.sidebarOpen = false;
+  if (store.courses.has(group.key)) router.push({ name: "course", params: { courseId: group.key } });
+  else if (group.jobs[0]) router.push({ name: "job", params: { jobId: group.jobs[0].id } });
+}
+
+function go(to: Parameters<typeof router.push>[0]): void {
+  ui.sidebarOpen = false;
+  router.push(to);
+}
+</script>
+
+<template>
+  <aside class="sidebar" :class="{ open: ui.sidebarOpen }">
+    <a class="brand" href="/" @click.prevent="go('/')">
+      <BrandMark />
+      <span>course2md<span class="brand-caption">课程笔记</span></span>
+    </a>
+    <button class="new-course" :class="{ active: route.name === 'new' }" @click="go('/')">
+      <AppIcon name="plus" :size="18" />
+      新建课程
+      <AppIcon name="book" :size="16" class="new-course-book" />
+    </button>
+    <label class="search-box">
+      <AppIcon name="search" :size="16" />
+      <span class="sr-only">搜索课程</span>
+      <input v-model="search" placeholder="搜索课程" autocomplete="off" />
+    </label>
+    <div class="sidebar-heading">
+      我的课程 <span>{{ groups.length || "" }}</span>
+    </div>
+    <nav class="course-list" aria-label="课程列表">
+      <section v-for="group in groups" :key="group.key" class="course-group">
+        <div class="course-group-heading">
+          <button
+            type="button"
+            class="folder-toggle"
+            :aria-expanded="expanded(group)"
+            :aria-label="`${expanded(group) ? '收起' : '展开'}${group.course.title}课次`"
+            @click="toggle(group)"
+          >
+            <AppIcon class="folder-chevron" name="chevron" :size="13" />
+          </button>
+          <button
+            type="button"
+            class="course-folder"
+            :class="{
+              selected: selectedCourse === group.key && !selectedJob,
+              busy: group.jobs.some(isBusy),
+              failed: group.jobs.some((job) => job.status === 'failed'),
+            }"
+            :title="`${group.course.title} · 下载其他节次`"
+            @click="openGroup(group)"
+          >
+            <span class="folder-icon" aria-hidden="true"></span>
+            <span class="folder-name">{{ group.course.title }}</span>
+            <span class="folder-count">{{ group.course.sessions?.length || group.jobs.length }}</span>
+          </button>
+        </div>
+        <div
+          class="course-sessions-collapse"
+          :class="{ expanded: expanded(group) }"
+          :inert="!expanded(group)"
+        >
+          <div class="course-sessions">
+            <button
+              v-for="job in group.jobs"
+              :key="job.id"
+              class="course-item"
+              :class="{
+                selected: selectedJob === job.id,
+                busy: isBusy(job),
+                failed: job.status === 'failed',
+              }"
+              :aria-current="selectedJob === job.id ? 'page' : 'false'"
+              :title="job.title"
+              @click="go({ name: 'job', params: { jobId: job.id } })"
+            >
+              <span class="name">
+                <span class="name-text">{{ sessionLabel(job) }}</span>
+                <b v-if="job.week" class="week-badge">第 {{ job.week }} 周</b>
+              </span>
+              <span class="info">
+                <i class="status-dot"></i>{{ agentName(job.agent) }} ·
+                {{ statusNames[job.status ?? ""] ?? job.status }}
+              </span>
+            </button>
+          </div>
+        </div>
+      </section>
+      <div v-if="!groups.length" class="history-empty">
+        <AppIcon :name="search ? 'search' : 'book'" :size="24" />
+        <p>{{ search ? "没有匹配的课程" : "你的知识，从这里积累" }}</p>
+        <small>{{ search ? "试试其他关键词" : "解析课程后，随时回来接着读" }}</small>
+      </div>
+    </nav>
+    <nav class="sidebar-nav" aria-label="管理">
+      <RouterLink to="/workers" @click="ui.sidebarOpen = false"><AppIcon name="server" />计算服务</RouterLink>
+      <RouterLink to="/plugins" @click="ui.sidebarOpen = false"><AppIcon name="puzzle" />插件</RouterLink>
+      <RouterLink to="/account" @click="ui.sidebarOpen = false"><AppIcon name="user" />账号</RouterLink>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="workspace-identity">
+        <span class="workspace-avatar">{{
+          session.mode === "server" ? session.user?.username?.slice(0, 1).toUpperCase() : "C"
+        }}</span>
+        <span
+          ><strong>{{ session.mode === "server" ? session.user?.username : "本地工作区" }}</strong
+          ><small
+            ><i class="online-dot"></i
+            >{{ session.mode === "server" ? "个人学习空间" : "在自己的节奏里学习" }}</small
+          ></span
+        >
+      </div>
+      <button
+        class="icon-button"
+        :title="`外观：${themeLabels[theme]}（点击切换）`"
+        :aria-label="`切换外观，当前${themeLabels[theme]}`"
+        @click="cycleTheme"
+      >
+        <AppIcon :name="theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'system'" :size="18" />
+      </button>
+    </div>
+  </aside>
+</template>

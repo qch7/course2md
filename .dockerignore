@@ -1,0 +1,17 @@
+.git
+.venv
+.venv-*
+.cache
+.claude
+asrlibs
+hf-cache
+tmp-test
+output
+course2md-output
+course2md-worker
+pytest-of-*
+**/__pycache__
+**/*.pyc
+web/node_modules
+deploy/.env
+.env
