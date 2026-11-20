@@ -114,5 +114,5 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
-      - run: uv sync --locked --extra asr
+      - run: uv sync --locked --extra asr --extra server
       - run: uv run pytest -q

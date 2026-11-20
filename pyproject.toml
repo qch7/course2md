@@ -48,6 +48,7 @@ asr = [
     "faster-whisper>=1.0",
     "av>=11",
     "opencv-python-headless>=4.8,<5",
+    "onnxruntime<1.24; python_version < '3.11'",
 ]
 # NVIDIA 运行库（Windows / Linux 上用 GPU 转写）
 cuda = ["nvidia-cublas-cu12", "nvidia-cudnn-cu12>=9,<10"]
