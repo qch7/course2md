@@ -48,6 +48,7 @@ def test_dsh_discovers_custom_install_from_windows_registry(tmp_path, monkeypatc
             raise FileNotFoundError(name)
         return entry[name], 1
 
+    monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setitem(
         sys.modules,
         "winreg",

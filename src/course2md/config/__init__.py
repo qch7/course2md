@@ -92,10 +92,11 @@ def bootstrap_runtime() -> list[Path]:
     """让 CTranslate2 能找到 pip 安装的 cuBLAS / cuDNN（Windows 需显式登记 DLL 目录）。"""
     dirs = find_cuda_dirs()
     for dll_dir in dirs:
-        try:
-            os.add_dll_directory(str(dll_dir))
-        except (AttributeError, OSError):
-            pass
+        if sys.platform == "win32":
+            try:
+                os.add_dll_directory(str(dll_dir))
+            except OSError:
+                pass
         if str(dll_dir) not in os.environ.get("PATH", ""):
             os.environ["PATH"] = str(dll_dir) + os.pathsep + os.environ.get("PATH", "")
     return dirs

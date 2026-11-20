@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -20,6 +21,8 @@ DSH_MODEL_PATCH = ".course2md-dsh-model.patch.yml"
 
 def _dsh_registry_roots() -> list[str]:
     """从 Windows 安装记录查找自定义安装目录；其它平台返回空列表。"""
+    if sys.platform != "win32":
+        return []
     try:
         import winreg
     except ImportError:

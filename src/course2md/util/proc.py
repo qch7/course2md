@@ -10,7 +10,10 @@ import subprocess
 import sys
 
 # 传给 subprocess 的 creationflags
-NO_WINDOW: int = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+if sys.platform == "win32":
+    NO_WINDOW: int = subprocess.CREATE_NO_WINDOW
+else:
+    NO_WINDOW = 0
 
 
 def kill_tree(process: subprocess.Popen) -> None:
