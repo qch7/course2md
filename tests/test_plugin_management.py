@@ -219,7 +219,7 @@ def test_real_wheel_install_load_and_delete_in_isolated_environment(tmp_path, mo
     if not shutil.which("uv"):
         pytest.skip("真实隔离环境测试需要 uv")
     environment = tmp_path / "environment"
-    venv.EnvBuilder(with_pip=False).create(environment)
+    venv.EnvBuilder(with_pip=False, symlinks=sys.platform != "win32").create(environment)
     python = environment / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     site = environment / (
         "Lib/site-packages"

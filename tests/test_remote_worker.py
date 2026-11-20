@@ -56,7 +56,9 @@ def deployment(tmp_path, monkeypatch):
     monkeypatch.setattr(media_stage.audio_mod, "prepare", lambda path, wav: (wav, 60))
     monkeypatch.setattr(media_stage.audio_mod, "read_wav", lambda path: [])
     monkeypatch.setattr(frames, "extract", extract)
-    monkeypatch.setattr(frames, "write_index", lambda frames, target, title: target.write_text("索引") and target)
+    monkeypatch.setattr(
+        frames, "write_index", lambda frames, target, title: target.write_text("索引", encoding="utf-8") and target
+    )
     monkeypatch.setattr(lesson, "build_note_pair", build_notes)
     monkeypatch.setenv("COURSE2MD_OUT_DIR", str(tmp_path / "hub"))
 
