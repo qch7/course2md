@@ -29,7 +29,7 @@ jobs:
       - run: uv build
       - name: 包中含有前端
         run: unzip -l dist/*.whl | grep -q "course2md/web_dist/index.html"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
