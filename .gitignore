@@ -28,3 +28,6 @@ deploy/.env
 src/course2md/web_dist/
 web/node_modules/
 web/src/api/schema.check.d.ts
+
+# 本地计算节点工作目录
+course2md-worker/
