@@ -9,6 +9,7 @@ llm-api         可调用 OpenAI 兼容接口（密钥从本机配置读取）
 agent:<name>    本机可启动对应的 Agent 预设（DSH、Codex 或插件）
 resolver:<n>    已安装对应的来源解析插件（含插件版本时写作 resolver:<n>@<版本>）
 hub             与 Hub 共享输出目录（只有内置 Worker 具备）
+node            独立节点（运行在 Hub 之外）。Hub 可能访问不了的网络请求（如列出课次）只派给它
 ==============  ==============================================
 """
 
@@ -54,4 +55,6 @@ def detect_capabilities(hub: bool = False, agents: bool = True) -> set[str]:
         caps.update(f"agent:{name}" for name in detect_agents())
     if hub:
         caps.update({"hub", "agent:custom"})
+    else:
+        caps.add("node")
     return caps | resolver_capabilities()

@@ -29,6 +29,7 @@ course2md worker --hub https://course.example.com --token c2m_xxx --work-dir D:\
 | `agent:dsh` / `agent:codex` | 本机可启动 DSH / Codex |
 | `resolver:<名称>` | 已安装对应的来源解析插件 |
 | `hub` | 与 Hub 共享输出目录，只有内置节点具备 |
+| `node` | 独立节点（运行在 Hub 之外）。列出课次这类 Hub 可能访问不了的请求只派给它，不会被 Hub 内置节点领取；升级节点后自动具备 |
 
 - 画面阶段优先在能运行所选筛选策略的转写节点执行。原节点无法抽帧时，具备相应画面能力和来源解析能力的节点可补下载视频并接手。视频已清理时也会补下载，已有转写继续复用。
 - 整理阶段需要筛选两张及以上截图时，节点须声明该任务使用的 `frame-selector:<名称>` 能力。

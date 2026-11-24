@@ -39,11 +39,11 @@ def node(hub, monkeypatch):  # noqa: F811
     fake = SimpleNamespace(name="fakeclass", list_sessions=list_sessions)
     monkeypatch.setattr("course2md.stages.sessions.get_resolver", lambda source: fake)
 
-    def start(worker_id="node-a", owner=None):
+    def start(worker_id="node-a", owner=None, capabilities=("resolver:fakeclass", "node")):
         if owner:
             worker_id, _token = hub.manager.queue.create_worker_token("个人节点", owner_id=owner)
         runner = WorkerRunner(
-            hub.manager.queue, {"resolver:fakeclass"}, worker_id=worker_id, kind="remote", poll_interval=0.05
+            hub.manager.queue, set(capabilities), worker_id=worker_id, kind="remote", poll_interval=0.05
         ).start()
         runners.append(runner)
         return runner
@@ -73,6 +73,23 @@ def test_resolve_runs_on_a_node_instead_of_the_hub(hub, node):  # noqa: F811
     assert node.calls == [SECRET_SOURCE]
     with hub.manager.store.db.session() as session:  # 解析任务（载荷里带来源凭证）用完即删
         assert not session.scalars(select(TaskRow).where(TaskRow.stage == "sessions")).all()
+
+
+def test_the_hubs_own_worker_never_takes_session_listing(hub, node):  # noqa: F811
+    """内置节点同样装了解析插件，但 Hub 可能访问不了该平台，列课次只能由独立节点执行。"""
+    admin = hub.client()
+    register_first_admin(admin, "teacher")
+    node.start(worker_id="builtin-like", capabilities=("resolver:fakeclass", "hub", "agent:custom"))
+    response = admin.post("/api/v1/resolve", json={"source": SECRET_SOURCE})
+    assert response.status_code == 400 and "node" in response.json()["error"]
+    assert node.calls == []
+
+
+def test_independent_nodes_advertise_the_node_capability():
+    from course2md.worker import detect_capabilities
+
+    assert "node" in detect_capabilities(agents=False)
+    assert "node" not in detect_capabilities(hub=True, agents=False)
 
 
 def test_node_resolution_failures_are_reported_as_resolver_errors(hub, node):  # noqa: F811
