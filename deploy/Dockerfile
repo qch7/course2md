@@ -18,6 +18,19 @@ WORKDIR /app
 RUN useradd --create-home --uid 10001 course2md \
     && mkdir -p /data && chown course2md /data
 
+# ------------------------------------------------------------------ 前端（只在构建时需要 Node）
+# 产物由 vite.config.ts 写到 ../src/course2md/web_dist，即本阶段的 /build/src/course2md/web_dist。
+# 不依赖构建上下文里预先构建的 web_dist（.dockerignore 已排除），避免镜像带上过期的前端。
+FROM node:22-slim AS web
+WORKDIR /build/web
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+# pnpm 版本取自 package.json 的 packageManager，升级时只改那一处
+RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY web ./
+RUN pnpm build
+
 # ------------------------------------------------------------------ Hub（不含转写依赖）
 FROM base AS hub
 ARG EXTRA_PACKAGES=""
@@ -25,6 +38,7 @@ COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project --extra server
 COPY src ./src
+COPY --from=web /build/src/course2md/web_dist ./src/course2md/web_dist
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --extra server \
     && if [ -n "$EXTRA_PACKAGES" ]; then uv pip install $EXTRA_PACKAGES; fi

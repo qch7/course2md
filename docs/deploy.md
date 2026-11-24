@@ -82,6 +82,8 @@
 
 - 数据在 `db-data`（数据库）与 `hub-data`（笔记、截图与产物）两个卷中，定期备份这两个卷以及 `.env`。
 - 升级：`git pull && docker compose build && docker compose up -d`，数据库结构在 Hub 启动时自动迁移。
+- 前端在镜像构建时由 `deploy/Dockerfile` 的 `web` 阶段（Node 22 + pnpm）自动构建，部署机不需要安装 Node，
+  也不必手动上传 `web_dist`；构建上下文里本地已有的 `src/course2md/web_dist` 会被 `.dockerignore` 排除，不会混进镜像。
 
 ## 不用 Docker
 

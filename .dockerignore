@@ -13,5 +13,6 @@ pytest-of-*
 **/__pycache__
 **/*.pyc
 web/node_modules
+src/course2md/web_dist
 deploy/.env
 .env
