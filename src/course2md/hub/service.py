@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import re
 import threading
+import time
 import uuid
 from dataclasses import asdict, replace
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote, unquote, urlparse
 
 from markdown_it import MarkdownIt
@@ -31,9 +33,11 @@ from ..config import (
     find_model,
 )
 from ..core.accounts import LOCAL_USER, User
+from ..errors import Course2mdError
 from ..jobs.manager import (
     ACTIVE_STATUSES,
     FORMATS,
+    TRASH_SECONDS,
     ConfirmationRequired,
     Job,
     JobManager,
@@ -52,7 +56,11 @@ from ..resolvers import (
     resolve_term_start,
     week_of,
 )
+from ..resolvers.base import SessionInfo
+from ..stages.codec import decode, options_to_dict
+from ..stages.executor import rebuild_task_error
 from ..stages.registry import PIPELINE_STAGES, STAGE_LABELS
+from ..stages.sessions import SessionsStage
 from ..util.text import safe_name
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".gif")
@@ -91,30 +99,141 @@ def _check_source(manager: JobManager, user: User, resolver_name: str) -> None:
         raise Forbidden("服务器上不能读取本地文件，请使用课程平台链接，或在自己的电脑上运行本地应用")
 
 
-def get_job(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> Job:
+def get_job(manager: JobManager, job_id: str, user: User = LOCAL_USER, include_deleted: bool = False) -> Job:
     job = manager.get(job_id)
-    if job is None or not visible(user, job.owner):
+    if job is None or not visible(user, job.owner) or (job.deleted_at is not None and not include_deleted):
         raise NotFound("任务不存在")
     return job
 
 
-def get_course(manager: JobManager, course_id: str, user: User = LOCAL_USER) -> dict:
+def get_course(manager: JobManager, course_id: str, user: User = LOCAL_USER, include_deleted: bool = False) -> dict:
     course = manager.courses.get(course_id)
-    if course is None or not visible(user, course.get("owner")):
+    if course is None or not visible(user, course.get("owner")) or (course.get("deleted_at") and not include_deleted):
         raise NotFound("课程不存在")
     return course
 
 
 def list_jobs(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
     with manager._lock:
-        jobs = [job for job in manager.jobs.values() if visible(user, job.owner)]
+        jobs = [job for job in manager.jobs.values() if visible(user, job.owner) and job.deleted_at is None]
     return [job.snapshot(0) for job in jobs]
 
 
 def list_courses(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
     with manager._lock:
-        courses = [course for course in manager.courses.values() if visible(user, course.get("owner"))]
+        courses = [
+            course
+            for course in manager.courses.values()
+            if visible(user, course.get("owner")) and not course.get("deleted_at")
+        ]
     return [manager.course_snapshot(course) for course in courses]
+
+
+# ---------------------------------------------------------------- 回收站
+def _request_cancel(manager: JobManager, job: Job) -> None:
+    job.cancel.set()
+    if getattr(manager, "queue", None):
+        for task in manager.queue.tasks_for_job(job.id):
+            manager.queue.cancel(task["id"])
+
+
+def delete_course(manager: JobManager, course_id: str, user: User = LOCAL_USER) -> dict:
+    """移入回收站：课程及其全部课次立即从列表消失，进行中的任务先取消；30 天内可恢复。"""
+    course = get_course(manager, course_id, user)
+    now = time.time()
+    for job in manager.course_jobs(course):
+        if job.deleted_at is not None:
+            continue
+        if job.status in ACTIVE_STATUSES:
+            _request_cancel(manager, job)
+            job.log("课程已删除，任务已取消")
+        manager.mark_job_deleted(job, now)
+    manager.mark_course_deleted(course, now)
+    return {"ok": True}
+
+
+def delete_job(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> dict:
+    job = get_job(manager, job_id, user)
+    if job.status in ACTIVE_STATUSES:
+        _request_cancel(manager, job)
+        job.log("任务已删除，已取消")
+    manager.mark_job_deleted(job, time.time())
+    return {"ok": True}
+
+
+def list_trash(manager: JobManager, user: User = LOCAL_USER) -> dict:
+    with manager._lock:
+        courses = [c for c in manager.courses.values() if c.get("deleted_at") and visible(user, c.get("owner"))]
+        jobs = [j for j in manager.jobs.values() if j.deleted_at is not None and visible(user, j.owner)]
+    hidden = {course["id"] for course in courses}
+    items = [
+        {
+            "kind": "course",
+            "id": course["id"],
+            "title": course.get("title") or "课程",
+            "deleted_at": course["deleted_at"],
+            "purge_at": course["deleted_at"] + TRASH_SECONDS,
+            "job_count": sum(1 for job in jobs if job.course_id == course["id"]),
+        }
+        for course in courses
+    ]
+    # 所属课程仍在列表中的单个课次，单独出现在回收站
+    items += [
+        {
+            "kind": "job",
+            "id": job.id,
+            "title": job.title or job.course or "课次",
+            "course": job.course,
+            "deleted_at": job.deleted_at,
+            "purge_at": (job.deleted_at or 0) + TRASH_SECONDS,
+            "job_count": 1,
+        }
+        for job in jobs
+        if job.course_id not in hidden
+    ]
+    items.sort(key=lambda item: item["deleted_at"], reverse=True)
+    return {
+        "items": items,
+        "retention_days": TRASH_SECONDS // 86400,
+        # 本地应用的输出目录是用户自己的，永久删除只清理记录
+        "removes_files": server_mode(manager),
+    }
+
+
+def _trashed(manager: JobManager, kind: str, item_id: str, user: User) -> Job | dict:
+    if kind == "course":
+        course = get_course(manager, item_id, user, include_deleted=True)
+        if not course.get("deleted_at"):
+            raise NotFound("回收站中没有这个课程")
+        return course
+    if kind == "job":
+        job = get_job(manager, item_id, user, include_deleted=True)
+        if job.deleted_at is None:
+            raise NotFound("回收站中没有这个课次")
+        return job
+    raise NotFound("未知的回收站项目")
+
+
+def restore_trash(manager: JobManager, kind: str, item_id: str, user: User = LOCAL_USER) -> dict:
+    item = _trashed(manager, kind, item_id, user)
+    if isinstance(item, dict):
+        manager.mark_course_deleted(item, None)
+        for job in manager.course_jobs(item):
+            if job.deleted_at is not None:
+                manager.mark_job_deleted(job, None)
+    else:
+        manager.mark_job_deleted(item, None)
+    return {"ok": True}
+
+
+def purge_trash(manager: JobManager, kind: str, item_id: str, user: User = LOCAL_USER) -> dict:
+    """立即永久删除，不再等待保留期。"""
+    item = _trashed(manager, kind, item_id, user)
+    if isinstance(item, dict):
+        manager.purge_course(item)
+    else:
+        manager.purge_job(item)
+    return {"ok": True}
 
 
 def refresh_course(manager: JobManager, course_id: str, body: dict, user: User = LOCAL_USER) -> dict:
@@ -201,6 +320,83 @@ def _frame_selector(manager: JobManager, requested: object) -> str:
     return requested
 
 
+SESSIONS_WAIT_SECONDS = 90.0
+
+
+def list_sessions(manager: JobManager, source: str, resolver, user: User = LOCAL_USER) -> list[SessionInfo]:
+    """列出来源的课次。
+
+    本地应用的 Hub 就是用户自己的电脑，直接解析。服务器上的 Hub 可能访问不了课程平台
+    （例如校内网），因此交给具备 ``resolver:<名称>`` 能力的计算节点解析，再把结果传回。
+    """
+    queue = getattr(manager, "queue", None)
+    if not server_mode(manager) or queue is None:
+        return resolver.list_sessions(source)
+
+    options = JobOptions(source=source, out_dir=manager.data_dir / "resolve" / uuid.uuid4().hex)
+    requires = SessionsStage.requires(options)
+    if not queue.capable_worker_online(requires, owner_id=user.id):
+        needed = "、".join(requires) or "对应解析器"
+        raise ResolverError(
+            f"没有在线的计算节点能解析该来源（需要 {needed}）。"
+            "请在「计算服务」中连接一台能访问该课程平台、并安装了对应解析插件的节点"
+        )
+    # 来源链接可能带登录凭证：任务载荷中的 source 与课程记录一样加密保存，任务结束后立即清除
+    job_id = f"sessions-{uuid.uuid4().hex[:12]}"
+    task_id = queue.enqueue(
+        job_id,
+        SessionsStage.name,
+        {"options": options_to_dict(options), "inputs": None, "run_id": ""},
+        requires=requires,
+        max_attempts=2,
+        owner_id=user.id,
+    )
+    deadline = time.monotonic() + SESSIONS_WAIT_SECONDS
+    try:
+        while True:
+            queue.reap()
+            task = queue.get(task_id)
+            if task is None:
+                raise ResolverError("解析任务记录丢失，请重试")
+            if task["status"] == "done":
+                result = decode(queue.output(task))
+                return list(result.sessions)
+            if task["status"] in ("failed", "cancelled"):
+                error = rebuild_task_error(task)
+                # 节点上未归类的异常也按解析失败展示，而不是 500
+                raise error if isinstance(error, Course2mdError) else ResolverError(str(error))
+            if time.monotonic() > deadline:
+                queue.cancel(task_id)
+                raise ResolverError("等待计算节点解析超时，请确认节点在线且能访问该课程平台后重试")
+            time.sleep(0.2)
+    finally:
+        queue.discard_job(job_id)
+
+
+def _stored_sessions(manager: JobManager, body: dict, source: str, user: User, wanted: list[str]) -> list[SessionInfo]:
+    """服务器上提交任务时优先使用解析时保存的课次，避免为同一来源再让节点访问一次平台。
+
+    只有保存的课次覆盖了全部选中课次、且来源一致时才使用，否则返回空列表交由调用方重新解析。
+    """
+    course = manager.courses.get(body.get("course_id") or "")
+    if not wanted or not course or not visible(user, course.get("owner")) or course.get("source") != source:
+        return []
+    stored = {item["id"]: item for item in course.get("sessions", [])}
+    if not all(session_id in stored for session_id in wanted):
+        return []
+    return [
+        SessionInfo(
+            session_id=item["id"],
+            date=item.get("date") or "",
+            title=item.get("title") or "",
+            views=int(item.get("views") or 0),
+            course=item.get("course") or "",
+            meta={str(k): str(v) for k, v in (item.get("meta") or {}).items()},
+        )
+        for item in stored.values()
+    ]
+
+
 def resolve_source(manager: JobManager, body: dict, user: User = LOCAL_USER) -> dict:
     from .plugins import ensure_ready
 
@@ -212,7 +408,7 @@ def resolve_source(manager: JobManager, body: dict, user: User = LOCAL_USER) -> 
     _check_source(manager, user, resolver.name)
     if body.get("course_id") and body["course_id"] in manager.courses:
         get_course(manager, body["course_id"], user)
-    sessions = resolver.list_sessions(source)
+    sessions = list_sessions(manager, source, resolver, user)
     root = output_root(manager, user, body.get("out_dir"))
     resolved = {**_describe_sessions(sessions, root, body.get("term_start", "")), **_resolver_fields(resolver, source)}
     course = manager.remember_course(source, root, resolved, body.get("course_id", ""), owner=user.id)
@@ -231,14 +427,16 @@ def create_targets(manager: JobManager, body: dict, source: str, root: Path, use
         wanted = [str(body["session_id"])]
     wanted = list(dict.fromkeys(wanted))
 
-    sessions = []
+    sessions: list[SessionInfo] = []
     resolver_name = ""
     failure: Exception | None = None
     try:
         resolver = get_resolver(source)
         resolver_name = resolver.name
         _check_source(manager, user, resolver_name)
-        sessions = resolver.list_sessions(source)
+        sessions = (
+            _stored_sessions(manager, body, source, user, wanted) if server_mode(manager) else []
+        ) or list_sessions(manager, source, resolver, user)
     except (ResolverError, OSError) as exc:
         failure = exc
 
@@ -260,7 +458,7 @@ def create_targets(manager: JobManager, body: dict, source: str, root: Path, use
     else:
         picked = []
 
-    targets = []
+    targets: list[dict[str, Any]] = []
     for session in picked:
         day = parse_date(session.date)
         week = week_of(day, term_start) if day and term_start else None
@@ -508,10 +706,7 @@ def send_message(manager: JobManager, job_id: str, body: dict, user: User = LOCA
 
 def cancel_job(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> dict:
     job = get_job(manager, job_id, user)
-    job.cancel.set()
-    if getattr(manager, "queue", None):
-        for task in manager.queue.tasks_for_job(job.id):
-            manager.queue.cancel(task["id"])
+    _request_cancel(manager, job)
     job.log("收到取消请求")
     manager._save(job)
     return {"ok": True}

@@ -98,8 +98,16 @@ class PasswordChange(BaseModel):
     new_password: str = Field("", max_length=256)
 
 
+class SetupRequest(Credentials):
+    setup_token: str = Field("", max_length=200)
+
+
 class UserUpdate(BaseModel):
-    disabled: bool
+    """管理员对用户的修改，只提交需要变更的字段。"""
+
+    disabled: bool | None = None
+    role: str | None = Field(None, max_length=20)
+    password: str | None = Field(None, max_length=256)
 
 
 class TokenRequest(BaseModel):
@@ -115,8 +123,14 @@ def _set_cookie(request: Request, response: Response, token: str) -> None:
 def status(request: Request) -> dict[str, Any]:
     accounts = _accounts(request)
     if accounts is None:
-        return {"mode": "local", "registration": "closed", "has_users": True}
-    return {"mode": "server", "registration": accounts.registration, "has_users": accounts.count() > 0}
+        return {"mode": "local", "registration": "closed", "has_users": True, "needs_setup": False}
+    has_users = accounts.count() > 0
+    return {
+        "mode": "server",
+        "registration": accounts.registration,
+        "has_users": has_users,
+        "needs_setup": not has_users,
+    }
 
 
 @router.get("/auth/me", summary="当前用户", response_model=r.UserResponse)
@@ -124,7 +138,21 @@ def me(user: User = Depends(current_user)) -> dict[str, Any]:
     return {"user": user.public()}
 
 
-@router.post("/auth/register", summary="注册；第一个用户成为管理员", response_model=r.UserResponse)
+@router.post("/auth/setup", summary="用启动日志中的初始化令牌创建首个管理员", response_model=r.UserResponse)
+def setup(body: SetupRequest, request: Request, response: Response) -> dict[str, Any]:
+    accounts = _require_accounts(request)
+    _throttle(request)  # 令牌足够长，仍限制猜测次数
+    try:
+        user = accounts.setup(body.username, body.password, body.setup_token)
+    except AccountError:
+        _record_failure(request)
+        raise
+    _, token = accounts.login(body.username, body.password)
+    _set_cookie(request, response, token)
+    return {"user": user.public()}
+
+
+@router.post("/auth/register", summary="自助注册（需管理员开放）", response_model=r.UserResponse)
 def register(body: Credentials, request: Request, response: Response) -> dict[str, Any]:
     accounts = _require_accounts(request)
     user = accounts.register(body.username, body.password)
@@ -180,9 +208,17 @@ def create_user(body: NewUser, request: Request, admin: User = Depends(admin_use
     return {"user": user.public()}
 
 
-@router.patch("/users/{user_id}", summary="停用或启用用户（管理员）", response_model=r.Ok)
+@router.patch("/users/{user_id}", summary="停用、启用、改角色或重置口令（管理员）", response_model=r.Ok)
 def update_user(user_id: str, body: UserUpdate, request: Request, admin: User = Depends(admin_user)) -> dict[str, Any]:
-    _require_accounts(request).set_disabled(user_id, body.disabled, admin)
+    accounts = _require_accounts(request)
+    if body.disabled is None and body.role is None and body.password is None:
+        raise AccountError("没有需要修改的内容")
+    if body.role is not None:
+        accounts.set_role(user_id, body.role, admin)
+    if body.password is not None:
+        accounts.reset_password(user_id, body.password, admin)
+    if body.disabled is not None:
+        accounts.set_disabled(user_id, body.disabled, admin)
     return {"ok": True}
 
 

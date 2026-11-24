@@ -13,6 +13,7 @@ from typing import Any
 
 from ..asr.formats import Segment
 from ..asr.frames import Frame
+from ..resolvers.base import SessionInfo
 
 ARTIFACT_VERSION = 1
 
@@ -275,11 +276,64 @@ class ChatOutput:
         return cls(data["text"], bool(data["updated"]))
 
 
+@dataclass
+class SessionList:
+    """解析阶段在节点上列出的课次（来源解析器的 ``list_sessions`` 结果）。"""
+
+    sessions: list[SessionInfo] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": "session-list",
+            "version": ARTIFACT_VERSION,
+            "sessions": [
+                {
+                    "session_id": item.session_id,
+                    "date": item.date,
+                    "title": item.title,
+                    "views": item.views,
+                    "week": item.week,
+                    "course": item.course,
+                    "meta": dict(item.meta),
+                }
+                for item in self.sessions
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SessionList:
+        _check(data, "session-list")
+        return cls(
+            [
+                SessionInfo(
+                    session_id=str(item["session_id"]),
+                    date=str(item.get("date") or ""),
+                    title=str(item.get("title") or ""),
+                    views=int(item.get("views") or 0),
+                    week=item.get("week"),
+                    course=str(item.get("course") or ""),
+                    meta={str(k): str(v) for k, v in (item.get("meta") or {}).items()},
+                )
+                for item in data.get("sessions") or []
+            ]
+        )
+
+
 Artifact = (
-    MediaFile | Transcript | FrameSet | TranscriptFiles | Notes | MediaOutput | OrganizeInput | ChatInput | ChatOutput
+    MediaFile
+    | Transcript
+    | FrameSet
+    | TranscriptFiles
+    | Notes
+    | MediaOutput
+    | OrganizeInput
+    | ChatInput
+    | ChatOutput
+    | SessionList
 )
 
 ARTIFACT_TYPES: dict[str, Any] = {
+    "session-list": SessionList,
     "chat-input": ChatInput,
     "chat-output": ChatOutput,
     "media-file": MediaFile,

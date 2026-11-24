@@ -15,6 +15,7 @@ from .media import MediaStage
 from .organize import OrganizeStage
 from .output import OutputStage
 from .proofread import ProofreadStage
+from .sessions import SessionsStage
 
 StageType = type[BaseStage[Any, Any]]
 
@@ -26,6 +27,7 @@ _STAGES: tuple[StageType, ...] = (
     OrganizeStage,
     ChatStage,
     CleanupStage,
+    SessionsStage,  # 不属于主流程：由 Hub 在解析来源时单独派发
 )
 
 STAGE_TYPES: dict[str, StageType] = {stage.name: stage for stage in _STAGES}

@@ -116,7 +116,7 @@
 
 ### 1.11 阶段 5：服务器部署
 
-- 账号 `core/accounts.py`：scrypt 加盐口令；第一个用户为管理员；`COURSE2MD_REGISTRATION` 控制开放注册；会话与 API 令牌只存摘要；停用用户时清除其会话。接口 `/api/v1/auth/*`、`/api/v1/users`；同一地址 10 分钟内登录失败 10 次后返回 429。
+- 账号 `core/accounts.py`：scrypt 加盐口令；首个管理员凭启动日志中的一次性初始化令牌创建（`/api/v1/auth/setup`）；`COURSE2MD_REGISTRATION` 控制开放自助注册；管理页支持改角色与重置口令；会话与 API 令牌只存摘要；停用用户时清除其会话。接口 `/api/v1/auth/*`、`/api/v1/users`；同一地址 10 分钟内登录失败 10 次后返回 429。
 - `course2md server`：必须设置 `COURSE2MD_SECRET_KEY`；`COURSE2MD_DATABASE_URL` 指向 PostgreSQL（留空用 SQLite）；信任 `COURSE2MD_TRUSTED_PROXIES` 的转发头；服务器模式只检查写请求来源，不限制 Host。旧页面在 401 时跳转到简单的登录页 `login.html`。
 - 隔离：课程、任务带归属；列表与读取只返回自己的记录（旧记录只对管理员可见）；同一来源不同用户各有课程记录；输出目录固定为 `<输出目录>/users/<用户编号>`。任务表带 `owner_id`，个人节点只领取主人的任务，管理员生成的共享节点领取全部。
 - 限制普通用户：本地文件来源、自定义整理命令、更换模型接口地址返回 403；配置接口不显示服务器路径。

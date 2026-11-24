@@ -98,6 +98,28 @@ def get_course(course_id: str, request: Request, user: CurrentUser) -> dict[str,
     return {"course": manager.course_snapshot(service.get_course(manager, course_id, user))}
 
 
+@router.delete(
+    "/courses/{course_id}", tags=["课程"], summary="删除课程（移入回收站，30 天后永久删除）", response_model=r.Ok
+)
+def delete_course(course_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.delete_course(_manager(request), course_id, user)
+
+
+@router.get("/trash", tags=["回收站"], summary="回收站中的课程与课次", response_model=r.TrashResponse)
+def list_trash(request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.list_trash(_manager(request), user)
+
+
+@router.post("/trash/{kind}/{item_id}/restore", tags=["回收站"], summary="从回收站恢复课程或课次", response_model=r.Ok)
+def restore_trash(kind: str, item_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.restore_trash(_manager(request), kind, item_id, user)
+
+
+@router.delete("/trash/{kind}/{item_id}", tags=["回收站"], summary="立即永久删除回收站中的项目", response_model=r.Ok)
+def purge_trash(kind: str, item_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.purge_trash(_manager(request), kind, item_id, user)
+
+
 @router.post(
     "/courses/{course_id}/refresh", tags=["课程"], summary="重新解析已保存课程的课次", response_model=r.ResolvedCourse
 )
@@ -119,6 +141,11 @@ def list_jobs(request: Request, user: CurrentUser) -> dict[str, Any]:
 )
 def create_job(body: CreateJobRequest, request: Request, user: CurrentUser) -> dict[str, Any]:
     return service.create_job(_manager(request), body.payload(), user)
+
+
+@router.delete("/jobs/{job_id}", tags=["任务"], summary="删除课次任务（移入回收站）", response_model=r.Ok)
+def delete_job(job_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.delete_job(_manager(request), job_id, user)
 
 
 @router.get(

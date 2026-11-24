@@ -10,6 +10,7 @@ export const session = reactive({
   mode: "local" as "local" | "server",
   registration: "closed",
   hasUsers: true,
+  needsSetup: false,
   user: null as UserInfo | null,
   config: null as Config | null,
 });
@@ -51,6 +52,7 @@ export async function loadStatus(): Promise<void> {
   session.mode = status.mode === "server" ? "server" : "local";
   session.registration = status.registration ?? "closed";
   session.hasUsers = status.has_users ?? true;
+  session.needsSetup = status.needs_setup ?? false;
 }
 
 export async function loadUser(): Promise<UserInfo | null> {

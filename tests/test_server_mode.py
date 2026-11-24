@@ -45,7 +45,11 @@ def hub(tmp_path, monkeypatch):
 
 
 def _register(client, username, password="password-123"):
-    response = client.post("/api/v1/auth/register", json={"username": username, "password": password})
+    """创建首个管理员：与真实部署一样，凭启动时生成的初始化令牌。"""
+    token = client.app.state.accounts.begin_setup()
+    response = client.post(
+        "/api/v1/auth/setup", json={"username": username, "password": password, "setup_token": token}
+    )
     assert response.status_code == 200, response.text
     return response.json()["user"]
 
@@ -59,12 +63,72 @@ def test_password_hashes_are_salted():
     assert first != second and verify_password("口令-123456", first) and not verify_password("wrong", first)
 
 
+def test_first_admin_requires_setup_token_from_startup(hub):
+    anonymous = hub.client()
+    body = {"username": "teacher", "password": "password-123"}
+    token = hub.accounts.begin_setup()
+    assert token and token.startswith("c2s_") and hub.accounts.begin_setup() == token  # 重复调用不换令牌
+    # 没有令牌的人既不能抢注，也不能通过自助注册接口绕过
+    assert anonymous.post("/api/v1/auth/register", json=body).status_code == 400
+    assert (
+        "初始化令牌" in anonymous.post("/api/v1/auth/setup", json={**body, "setup_token": "c2s_wrong"}).json()["error"]
+    )
+    assert anonymous.post("/api/v1/auth/setup", json=body).status_code == 400
+    assert hub.accounts.count() == 0
+    created = anonymous.post("/api/v1/auth/setup", json={**body, "setup_token": token})
+    assert created.status_code == 200 and created.json()["user"]["role"] == "admin"
+    assert anonymous.get("/api/v1/auth/me").json()["user"]["username"] == "teacher"
+    # 令牌一次有效，创建后作废；再次使用不能添加管理员
+    assert hub.accounts.begin_setup() is None
+    again = hub.client().post(
+        "/api/v1/auth/setup", json={"username": "intruder", "password": "password-123", "setup_token": token}
+    )
+    assert again.status_code == 400 and "已完成初始化" in again.json()["error"]
+
+
+def test_setup_attempts_are_throttled(hub):
+    hub.accounts.begin_setup()
+    attacker = hub.client()
+    body = {"username": "teacher", "password": "password-123", "setup_token": "c2s_guess"}
+    codes = [attacker.post("/api/v1/auth/setup", json=body).status_code for _ in range(12)]
+    assert codes[:10] == [400] * 10 and codes[-1] == 429
+    assert hub.accounts.count() == 0
+
+
+def test_admin_manages_roles_and_resets_passwords(hub):
+    admin = hub.client()
+    _register(admin, "teacher")
+    alice_id = admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"}).json()["user"]["id"]
+    teacher_id = admin.get("/api/v1/auth/me").json()["user"]["id"]
+    alice = hub.client()
+    assert alice.post("/api/v1/auth/login", json={"username": "alice", "password": "password-123"}).status_code == 200
+    token = alice.post("/api/v1/auth/tokens", json={}).json()["token"]
+
+    assert admin.patch(f"/api/v1/users/{alice_id}", json={}).status_code == 400
+    assert admin.patch(f"/api/v1/users/{alice_id}", json={"role": "root"}).status_code == 400
+    assert admin.patch(f"/api/v1/users/{teacher_id}", json={"role": "user"}).status_code == 400  # 不能降级自己
+    assert admin.patch(f"/api/v1/users/{teacher_id}", json={"password": "another-pass-1"}).status_code == 400
+    assert admin.patch(f"/api/v1/users/{alice_id}", json={"password": "short"}).status_code == 400
+
+    assert admin.patch(f"/api/v1/users/{alice_id}", json={"role": "admin"}).status_code == 200
+    assert alice.get("/api/v1/users").status_code == 200
+    assert admin.patch(f"/api/v1/users/{alice_id}", json={"password": "new-password-1"}).status_code == 200
+    # 重置口令会注销该用户的会话与 API 令牌，旧口令不能再登录
+    assert alice.get("/api/v1/jobs").status_code == 401
+    assert hub.client().get("/api/v1/jobs", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    login = hub.client().post("/api/v1/auth/login", json={"username": "alice", "password": "password-123"})
+    assert login.status_code == 400
+    login = hub.client().post("/api/v1/auth/login", json={"username": "alice", "password": "new-password-1"})
+    assert login.status_code == 200
+
+
 def test_first_user_becomes_admin_and_registration_is_closed(hub):
     anonymous = hub.client()
     assert anonymous.get("/api/v1/auth/status").json() == {
         "mode": "server",
         "registration": "closed",
         "has_users": False,
+        "needs_setup": True,
     }
     assert anonymous.get("/api/v1/jobs").status_code == 401
     admin = hub.client()
@@ -84,7 +148,10 @@ def test_first_user_becomes_admin_and_registration_is_closed(hub):
 
 def test_bearer_tokens_and_cookies_are_secure(hub):
     client = hub.client()
-    response = client.post("/api/v1/auth/register", json={"username": "teacher", "password": "password-123"})
+    response = client.post(
+        "/api/v1/auth/setup",
+        json={"username": "teacher", "password": "password-123", "setup_token": hub.accounts.begin_setup()},
+    )
     cookie = response.headers["set-cookie"].lower()
     assert "httponly" in cookie and "secure" in cookie and "samesite=lax" in cookie
     token = client.post("/api/v1/auth/tokens", json={"name": "脚本"}).json()["token"]

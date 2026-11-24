@@ -35,9 +35,16 @@ export function resetApiSession(): void {
   sessionEpoch += 1;
 }
 
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH"]);
+
 client.use({
   onRequest({ request }) {
     requestEpochs.set(request, sessionEpoch);
+    // 服务端要求写请求声明 application/json（跨站表单无法伪造，是 CSRF 防线之一）。
+    // 停止任务、退出登录这类没有请求体的 POST，openapi-fetch 不会带 Content-Type，需要补上。
+    if (WRITE_METHODS.has(request.method) && !request.headers.has("content-type")) {
+      request.headers.set("content-type", "application/json");
+    }
   },
   onResponse({ request, response }) {
     if (requestEpochs.get(request) !== sessionEpoch) throw new Error("登录状态已变更，请重试");

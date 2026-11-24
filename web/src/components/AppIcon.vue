@@ -3,6 +3,7 @@ withDefaults(defineProps<{ name: string; size?: number }>(), { size: 18 });
 
 const paths: Record<string, string> = {
   plus: "M12 5v14M5 12h14",
+  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   search: "m20 20-4.5-4.5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0",
   book: "M12 5.5C9 3.5 5.5 3.5 3 4.5v14c3-1 6-1 9 1 3-2 6-2 9-1v-14c-2.5-1-6-1-9 1Zm0 0v14",
   server:

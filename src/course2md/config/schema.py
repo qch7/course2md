@@ -246,7 +246,7 @@ SETTINGS: tuple[Setting, ...] = (
         "registration",
         "closed",
         "str",
-        "是否开放注册。closed 时由管理员在用户管理中创建账号；第一个账号总是可以注册并成为管理员。",
+        "是否开放自助注册。closed 时由管理员在「管理」页创建账号；首个管理员凭服务启动日志中的初始化令牌创建，不受此项影响。",
         choices=("open", "closed"),
     ),
     Setting(

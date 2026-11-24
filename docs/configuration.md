@@ -108,7 +108,7 @@
 |---|---|---|---|
 | `COURSE2MD_SECRET_KEY` | `secret_key` | `（空）` | 加密保存来源链接等凭证的密钥，服务器形态必须设置为随机字符串并妥善备份；更换后旧数据无法解密。 |
 | `COURSE2MD_DATABASE_URL` | `database_url` | `（空）` | 数据库地址，例如 postgresql+psycopg://user:pass@db/course2md；留空使用输出目录中的 SQLite。 |
-| `COURSE2MD_REGISTRATION` | `registration` | `closed` | 是否开放注册。closed 时由管理员在用户管理中创建账号；第一个账号总是可以注册并成为管理员。可选：open, closed。 |
+| `COURSE2MD_REGISTRATION` | `registration` | `closed` | 是否开放自助注册。closed 时由管理员在「管理」页创建账号；首个管理员凭服务启动日志中的初始化令牌创建，不受此项影响。可选：open, closed。 |
 | `COURSE2MD_TRUSTED_PROXIES` | `trusted_proxies` | `127.0.0.1` | 信任其 X-Forwarded-* 头的反向代理地址，逗号分隔；容器部署中 Hub 不对外暴露时可设为 *。 |
 
 ## 计算节点

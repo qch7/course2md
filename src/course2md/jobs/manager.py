@@ -6,6 +6,7 @@ import hashlib
 import json
 import queue
 import re
+import shutil
 import threading
 import time
 import traceback
@@ -36,6 +37,8 @@ from ..util.text import safe_name
 from .storage import WorkspaceStore
 
 ACTIVE_STATUSES = ("queued", "running")
+TRASH_SECONDS = 30 * 24 * 3600  # 回收站保留期
+PURGE_INTERVAL = 3600.0
 FORMATS = ("srt", "vtt", "txt", "md", "json")
 
 
@@ -70,6 +73,7 @@ class Job:
     agent: str = ""
     agent_model: str = ""
     owner: str = "local"  # 所属用户：本地模式为 local，服务器形态为用户编号
+    deleted_at: float | None = None  # 移入回收站的时间；超过保留期后永久删除
     timings: dict[str, float] = field(default_factory=dict)
     events: list[dict] = field(default_factory=list)
     messages: list[dict] = field(default_factory=list)
@@ -322,6 +326,97 @@ class JobManager:
                 for message in job.messages:
                     if message["role"] == "user" and message.get("status") == "queued":
                         self._queue.put((job, ChatRequest(message["id"], message["text"])))
+        self._janitor = threading.Thread(target=self._purge_loop, daemon=True)
+        self._janitor.start()
+
+    # ------------------------------------------------------------ 回收站
+    def mark_job_deleted(self, job: Job, when: float | None) -> None:
+        """移入（when 为时间戳）或移出（None）回收站。"""
+        with job._lock:
+            job.deleted_at = when
+        self._save(job)
+
+    def mark_course_deleted(self, course: dict, when: float | None) -> None:
+        with self._lock:
+            if when is None:
+                course.pop("deleted_at", None)
+            else:
+                course["deleted_at"] = when
+            self.store.save_course(course)
+
+    def course_jobs(self, course: dict) -> list[Job]:
+        with self._lock:
+            return [
+                job for job in self.jobs.values() if job.course_id == course["id"] and job.owner == course.get("owner")
+            ]
+
+    def purge_job(self, job: Job) -> None:
+        """永久删除任务：数据库记录、阶段记录与版本；服务器形态下还删除其输出目录。
+
+        本地应用的输出目录由用户自己选择（可能是知识库），只清理记录，不删除用户磁盘上的文件。
+        """
+        with self._lock:
+            self.jobs.pop(job.id, None)
+        self.store.delete_job(job.id)
+        self.queue.discard_job(job.id)
+        self.versions.discard(job.id)
+        if self.mode == "server":
+            self._remove_output(job.out_dir)
+
+    def purge_course(self, course: dict) -> None:
+        for job in self.course_jobs(course):
+            if job.status in ACTIVE_STATUSES:
+                continue
+            self.purge_job(job)
+        with self._lock:
+            if self.course_jobs(course):
+                return  # 仍有活动任务，稍后再清理
+            self.courses.pop(course["id"], None)
+        self.store.delete_course(course["id"])
+
+    def purge_deleted(self, now: float | None = None, retention: float = TRASH_SECONDS) -> int:
+        """永久删除超过保留期的回收站内容，返回清理的任务数。"""
+        cutoff = (time.time() if now is None else now) - retention
+        with self._lock:
+            jobs = [
+                job
+                for job in self.jobs.values()
+                if job.deleted_at is not None and job.deleted_at <= cutoff and job.status not in ACTIVE_STATUSES
+            ]
+            courses = [
+                course
+                for course in self.courses.values()
+                if course.get("deleted_at") and course["deleted_at"] <= cutoff
+            ]
+        for job in jobs:
+            self.purge_job(job)
+        for course in courses:
+            self.purge_course(course)
+        return len(jobs)
+
+    def _remove_output(self, out_dir: Path) -> None:
+        """只删除服务器托管目录（输出根目录下的 users/）内的内容，并清理变空的课程文件夹。"""
+        base = (Path(default_out_dir()).expanduser().resolve() / "users").resolve()
+        target = Path(out_dir).resolve()
+        if target == base or not target.is_relative_to(base):
+            return
+        shutil.rmtree(target, ignore_errors=True)
+        parent = target.parent
+        # 只清理变空的课程文件夹，保留 users/<用户编号> 这一层
+        while parent.parent != base and parent.is_relative_to(base):
+            try:
+                parent.rmdir()  # 非空时抛出 OSError，保留
+            except OSError:
+                break
+            parent = parent.parent
+
+    def _purge_loop(self) -> None:
+        while not self._closing.is_set():
+            try:
+                self.purge_deleted()
+            except Exception as exc:  # noqa: BLE001  清理失败不应影响服务，下个周期重试
+                self.warnings.append(f"清理回收站失败（{exc}）")
+            self._closing.wait(PURGE_INTERVAL)
 
     def submit(self, job: Job, options: JobOptions) -> Job:
         if getattr(self, "_closing", threading.Event()).is_set():
@@ -359,6 +454,7 @@ class JobManager:
                 "title": resolved.get("course") or previous.get("title") or Path(source).stem or "课程",
                 "updated_at": time.time(),
             }
+            course.pop("deleted_at", None)  # 重新解析同一来源视为恢复该课程；其下已删除的任务仍留在回收站
             # 没有解析到课次时（例如任务创建时解析失败），保留已经保存的完整课次。
             if not resolved.get("sessions") and previous.get("sessions"):
                 course["sessions"] = previous["sessions"]
@@ -370,7 +466,7 @@ class JobManager:
 
     def course_snapshot(self, course: dict) -> dict:
         with self._lock:
-            related = [job for job in self.jobs.values() if job.course_id == course["id"]]
+            related = [job for job in self.jobs.values() if job.course_id == course["id"] and job.deleted_at is None]
         sessions = []
         for session in course.get("sessions", []):
             current = next(

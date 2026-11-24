@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from ..storage import ArtifactStore
 from .db import Database
@@ -48,6 +48,11 @@ class NoteVersions:
                 )
             )
             return version
+
+    def discard(self, job_id: str) -> None:
+        """任务被永久删除时清除其版本记录（内容按摘要共享，不在此删除）。"""
+        with self.db.session() as session:
+            session.execute(delete(NoteVersionRow).where(NoteVersionRow.job_id == job_id))
 
     def list(self, job_id: str) -> list[dict[str, Any]]:
         with self.db.session() as session:

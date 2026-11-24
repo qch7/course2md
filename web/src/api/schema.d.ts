@@ -81,8 +81,25 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** 注册；第一个用户成为管理员 */
+    /** 自助注册（需管理员开放） */
     post: operations["register_api_v1_auth_register_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 用启动日志中的初始化令牌创建首个管理员 */
+    post: operations["setup_api_v1_auth_setup_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -168,7 +185,8 @@ export interface paths {
     get: operations["get_course_api_v1_courses__course_id__get"];
     put?: never;
     post?: never;
-    delete?: never;
+    /** 删除课程（移入回收站，30 天后永久删除） */
+    delete: operations["delete_course_api_v1_courses__course_id__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -220,7 +238,8 @@ export interface paths {
     get: operations["get_job_api_v1_jobs__job_id__get"];
     put?: never;
     post?: never;
-    delete?: never;
+    /** 删除课次任务（移入回收站） */
+    delete: operations["delete_job_api_v1_jobs__job_id__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -482,6 +501,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/trash": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 回收站中的课程与课次 */
+    get: operations["list_trash_api_v1_trash_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trash/{kind}/{item_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 立即永久删除回收站中的项目 */
+    delete: operations["purge_trash_api_v1_trash__kind___item_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/trash/{kind}/{item_id}/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 从回收站恢复课程或课次 */
+    post: operations["restore_trash_api_v1_trash__kind___item_id__restore_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/users": {
     parameters: {
       query?: never;
@@ -513,7 +583,7 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    /** 停用或启用用户（管理员） */
+    /** 停用、启用、改角色或重置口令（管理员） */
     patch: operations["update_user_api_v1_users__user_id__patch"];
     trace?: never;
   };
@@ -795,6 +865,11 @@ export interface components {
        * @default local
        */
       mode: string;
+      /**
+       * Needs Setup
+       * @default false
+       */
+      needs_setup: boolean;
       /**
        * Registration
        * @default closed
@@ -1928,6 +2003,24 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** SetupRequest */
+    SetupRequest: {
+      /**
+       * Password
+       * @default
+       */
+      password: string;
+      /**
+       * Setup Token
+       * @default
+       */
+      setup_token: string;
+      /**
+       * Username
+       * @default
+       */
+      username: string;
+    };
     /** Task */
     Task: {
       /** Affinity */
@@ -2051,6 +2144,63 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** TrashItem */
+    TrashItem: {
+      /**
+       * Course
+       * @default
+       */
+      course: string;
+      /**
+       * Deleted At
+       * @default 0
+       */
+      deleted_at: number;
+      /** Id */
+      id: string;
+      /**
+       * Job Count
+       * @default 0
+       */
+      job_count: number;
+      /**
+       * Kind
+       * @default course
+       */
+      kind: string;
+      /**
+       * Purge At
+       * @default 0
+       */
+      purge_at: number;
+      /**
+       * Title
+       * @default
+       */
+      title: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TrashResponse */
+    TrashResponse: {
+      /**
+       * Items
+       * @default []
+       */
+      items: components["schemas"]["TrashItem"][];
+      /**
+       * Removes Files
+       * @default false
+       */
+      removes_files: boolean;
+      /**
+       * Retention Days
+       * @default 30
+       */
+      retention_days: number;
+    } & {
+      [key: string]: unknown;
+    };
     /** UserInfo */
     UserInfo: {
       /** Created At */
@@ -2081,10 +2231,17 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** UserUpdate */
+    /**
+     * UserUpdate
+     * @description 管理员对用户的修改，只提交需要变更的字段。
+     */
     UserUpdate: {
       /** Disabled */
-      disabled: boolean;
+      disabled?: boolean | null;
+      /** Password */
+      password?: string | null;
+      /** Role */
+      role?: string | null;
     };
     /** UsersResponse */
     UsersResponse: {
@@ -2379,6 +2536,39 @@ export interface operations {
       };
     };
   };
+  setup_api_v1_auth_setup_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetupRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UserResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   status_api_v1_auth_status_get: {
     parameters: {
       query?: never;
@@ -2490,6 +2680,37 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["CourseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_course_api_v1_courses__course_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        course_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
         };
       };
       /** @description Validation Error */
@@ -2621,6 +2842,37 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Job"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_job_api_v1_jobs__job_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
         };
       };
       /** @description Validation Error */
@@ -3129,6 +3381,90 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ResolvedCourse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_trash_api_v1_trash_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TrashResponse"];
+        };
+      };
+    };
+  };
+  purge_trash_api_v1_trash__kind___item_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: string;
+        item_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  restore_trash_api_v1_trash__kind___item_id__restore_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: string;
+        item_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
         };
       };
       /** @description Validation Error */

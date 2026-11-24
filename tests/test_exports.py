@@ -47,7 +47,7 @@ def test_export_respects_account_ownership(course_job):
     manager, job = course_job
     accounts = Accounts(manager.store.db)
     app = create_app(manager, accounts=accounts)
-    owner = accounts.register("owner", "password-123", role="admin")
+    owner = accounts.setup("owner", "password-123", accounts.begin_setup() or "")
     job.owner = owner.id
     accounts.register("other", "password-123", by=owner)
     client = TestClient(app, base_url="https://course.example.com")

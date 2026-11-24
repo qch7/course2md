@@ -46,6 +46,18 @@ class WorkspaceStore:
             stored = self.cipher.map_fields(course, COURSE_FIELDS, encrypt=True)
             session.merge(CourseRow(id=course["id"], data=json.dumps(stored, ensure_ascii=False)))
 
+    def delete_course(self, course_id: str) -> None:
+        with self.db.session() as session:
+            row = session.get(CourseRow, course_id)
+            if row is not None:
+                session.delete(row)
+
+    def delete_job(self, job_id: str) -> None:
+        with self.db.session() as session:
+            row = session.get(JobRow, job_id)
+            if row is not None:
+                session.delete(row)
+
     def save_job(self, job: dict, replace_existing: bool = False) -> bool:
         """replace_existing 时同一输出目录的旧记录被替换；否则输出目录已被其它任务占用时不写入并返回 False。"""
         data = json.dumps(self.cipher.map_fields(job, JOB_FIELDS, encrypt=True), ensure_ascii=False, default=str)

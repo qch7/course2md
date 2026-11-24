@@ -2,18 +2,20 @@
 import { computed, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import type { Course, Job } from "@/api/client";
+import { client, type Course, type Job, unwrap } from "@/api/client";
 import AppIcon from "@/components/AppIcon.vue";
 import BrandMark from "@/components/BrandMark.vue";
-import { isBusy, store } from "@/stores/jobs";
-import { session } from "@/stores/session";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { dropJob, isBusy, store } from "@/stores/jobs";
+import { isAdmin, session } from "@/stores/session";
 import { cycleTheme, theme, themeLabels } from "@/stores/theme";
-import { ui } from "@/stores/ui";
+import { showError, toast, ui } from "@/stores/ui";
 import { agentName, sessionLabel, statusNames } from "@/utils/format";
 
 const route = useRoute();
 const router = useRouter();
 const search = ref("");
+const confirmation = ref<InstanceType<typeof ConfirmDialog> | null>(null);
 
 function loadFolders(): Record<string, boolean> {
   try {
@@ -89,6 +91,40 @@ function go(to: Parameters<typeof router.push>[0]): void {
   ui.sidebarOpen = false;
   router.push(to);
 }
+
+/** 移入回收站（逻辑删除）：进行中的任务会被取消，30 天内可在回收站恢复。 */
+async function removeGroup(group: Group): Promise<void> {
+  const busy = group.jobs.some(isBusy);
+  const confirmed = await confirmation.value?.open({
+    title: "删除课程",
+    message: `确定删除「${group.course.title}」？`,
+    detail: busy
+      ? "其中有正在整理的课次，删除会先取消它们。课程会移入回收站，30 天内可以恢复。"
+      : "课程会移入回收站，30 天内可以恢复，之后才会永久删除。",
+    confirmText: "移入回收站",
+  });
+  if (!confirmed) return;
+  try {
+    if (store.courses.has(group.key)) {
+      await unwrap(
+        client.DELETE("/api/v1/courses/{course_id}", { params: { path: { course_id: group.key } } }),
+      );
+      store.courses.delete(group.key);
+    } else {
+      // 没有课程记录的旧任务逐个删除
+      for (const job of group.jobs) {
+        await unwrap(client.DELETE("/api/v1/jobs/{job_id}", { params: { path: { job_id: job.id } } }));
+      }
+    }
+    const viewing =
+      selectedCourse.value === group.key || group.jobs.some((job) => job.id === selectedJob.value);
+    group.jobs.forEach((job) => dropJob(job.id));
+    if (viewing) await router.replace("/");
+    toast("已移入回收站，30 天内可以恢复");
+  } catch (error) {
+    showError(error);
+  }
+}
 </script>
 
 <template>
@@ -137,6 +173,15 @@ function go(to: Parameters<typeof router.push>[0]): void {
             <span class="folder-name">{{ group.course.title }}</span>
             <span class="folder-count">{{ group.course.sessions?.length || group.jobs.length }}</span>
           </button>
+          <button
+            type="button"
+            class="folder-delete"
+            :aria-label="`删除课程${group.course.title}`"
+            title="移入回收站"
+            @click="removeGroup(group)"
+          >
+            <AppIcon name="trash" :size="14" />
+          </button>
         </div>
         <div
           class="course-sessions-collapse"
@@ -176,9 +221,13 @@ function go(to: Parameters<typeof router.push>[0]): void {
       </div>
     </nav>
     <nav class="sidebar-nav" aria-label="管理">
+      <RouterLink to="/trash" @click="ui.sidebarOpen = false"><AppIcon name="trash" />回收站</RouterLink>
       <RouterLink to="/workers" @click="ui.sidebarOpen = false"><AppIcon name="server" />计算服务</RouterLink>
       <RouterLink to="/plugins" @click="ui.sidebarOpen = false"><AppIcon name="puzzle" />插件</RouterLink>
       <RouterLink to="/account" @click="ui.sidebarOpen = false"><AppIcon name="user" />账号</RouterLink>
+      <RouterLink v-if="session.mode === 'server' && isAdmin()" to="/admin" @click="ui.sidebarOpen = false"
+        ><AppIcon name="settings" />管理</RouterLink
+      >
     </nav>
     <div class="sidebar-footer">
       <div class="workspace-identity">
@@ -202,5 +251,6 @@ function go(to: Parameters<typeof router.push>[0]): void {
         <AppIcon :name="theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'system'" :size="18" />
       </button>
     </div>
+    <ConfirmDialog ref="confirmation" />
   </aside>
 </template>

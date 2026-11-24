@@ -28,7 +28,7 @@ Anki 导出使用课程工作区中的结构化记录；Obsidian 同步只复制
 
 | 目录 | 职责 |
 |---|---|
-| `src/course2md/stages/` | 流水线阶段（media、frames、proofread、output、organize）、chat 与 cleanup 任务、阶段注册表、任务选项、产物格式、执行器 |
+| `src/course2md/stages/` | 流水线阶段（media、frames、proofread、output、organize）、chat、cleanup 与 sessions（在节点上列出课次）任务、阶段注册表、任务选项、产物格式、执行器 |
 | `src/course2md/pipeline.py` | 编排阶段、选择主音轨、写出 `job.json`、清理下载的视频 |
 | `src/course2md/core/` | 数据库与迁移、阶段任务队列、账号、凭证加密、笔记版本 |
 | `src/course2md/storage/` | 按内容寻址的产物存储 |

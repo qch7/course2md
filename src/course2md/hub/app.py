@@ -240,8 +240,15 @@ def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> None:
     accounts = Accounts(manager.store.db, registration=env("COURSE2MD_REGISTRATION", "closed"))
     app = create_app(manager, bind_host=host, accounts=accounts)
     trusted = env("COURSE2MD_TRUSTED_PROXIES", "127.0.0.1")
-    if accounts.count() == 0:
-        print("还没有账号：打开网页注册的第一个账号将成为管理员。")
+    setup_token = accounts.begin_setup()
+    if setup_token:
+        # 令牌只打印这一次、只存于内存：谁能读到服务日志，谁就是部署者，可以创建首个管理员。
+        print(
+            "\n" + "=" * 64 + "\n"
+            "还没有任何账号。请打开网页，用下面的初始化令牌创建管理员：\n\n"
+            f"    {setup_token}\n\n"
+            "令牌仅在本次运行内有效，创建成功后立即作废；重启服务会生成新的令牌。\n" + "=" * 64 + "\n"
+        )
     print(f"course2md 服务器已启动：http://{host}:{port}（数据库 {manager.store.db.url.split('@')[-1]}）")
     try:
         uvicorn.run(

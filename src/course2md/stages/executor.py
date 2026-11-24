@@ -174,7 +174,7 @@ class QueueExecutor:
             if status == "cancelled":
                 raise Cancelled(task["error"] or "任务已取消")
             if status == "failed":
-                raise _rebuild_error(task)
+                raise rebuild_task_error(task)
             if (
                 status == "pending"
                 and not hinted
@@ -202,7 +202,7 @@ class QueueExecutor:
             )
 
 
-def _rebuild_error(task: dict[str, Any]) -> Exception:
+def rebuild_task_error(task: dict[str, Any]) -> Exception:
     """还原为节点上的业务错误类型（见 :mod:`course2md.errors`），便于沿用原有的失败处理。"""
     # 导入定义业务错误的模块，确保其类型已登记
     from .. import agents, resolvers  # noqa: F401

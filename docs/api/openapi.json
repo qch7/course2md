@@ -42,6 +42,11 @@
             "title": "Mode",
             "type": "string"
           },
+          "needs_setup": {
+            "default": false,
+            "title": "Needs Setup",
+            "type": "boolean"
+          },
           "registration": {
             "default": "closed",
             "title": "Registration",
@@ -1849,6 +1854,30 @@
         "title": "Session",
         "type": "object"
       },
+      "SetupRequest": {
+        "properties": {
+          "password": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string"
+          },
+          "setup_token": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Setup Token",
+            "type": "string"
+          },
+          "username": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "title": "SetupRequest",
+        "type": "object"
+      },
       "Task": {
         "additionalProperties": true,
         "properties": {
@@ -2057,6 +2086,75 @@
         "title": "TokenResponse",
         "type": "object"
       },
+      "TrashItem": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "default": "",
+            "title": "Course",
+            "type": "string"
+          },
+          "deleted_at": {
+            "default": 0.0,
+            "title": "Deleted At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_count": {
+            "default": 0,
+            "title": "Job Count",
+            "type": "integer"
+          },
+          "kind": {
+            "default": "course",
+            "title": "Kind",
+            "type": "string"
+          },
+          "purge_at": {
+            "default": 0.0,
+            "title": "Purge At",
+            "type": "number"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "TrashItem",
+        "type": "object"
+      },
+      "TrashResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TrashItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "removes_files": {
+            "default": false,
+            "title": "Removes Files",
+            "type": "boolean"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          }
+        },
+        "title": "TrashResponse",
+        "type": "object"
+      },
       "UserInfo": {
         "additionalProperties": true,
         "properties": {
@@ -2111,15 +2209,44 @@
         "type": "object"
       },
       "UserUpdate": {
+        "description": "管理员对用户的修改，只提交需要变更的字段。",
         "properties": {
           "disabled": {
-            "title": "Disabled",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
           }
         },
-        "required": [
-          "disabled"
-        ],
         "title": "UserUpdate",
         "type": "object"
       },
@@ -2522,7 +2649,48 @@
             "description": "Validation Error"
           }
         },
-        "summary": "注册；第一个用户成为管理员",
+        "summary": "自助注册（需管理员开放）",
+        "tags": [
+          "账号"
+        ]
+      }
+    },
+    "/api/v1/auth/setup": {
+      "post": {
+        "operationId": "setup_api_v1_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "用启动日志中的初始化令牌创建首个管理员",
         "tags": [
           "账号"
         ]
@@ -2633,6 +2801,46 @@
       }
     },
     "/api/v1/courses/{course_id}": {
+      "delete": {
+        "operationId": "delete_course_api_v1_courses__course_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "删除课程（移入回收站，30 天后永久删除）",
+        "tags": [
+          "课程"
+        ]
+      },
       "get": {
         "operationId": "get_course_api_v1_courses__course_id__get",
         "parameters": [
@@ -2790,6 +2998,46 @@
       }
     },
     "/api/v1/jobs/{job_id}": {
+      "delete": {
+        "operationId": "delete_job_api_v1_jobs__job_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "删除课次任务（移入回收站）",
+        "tags": [
+          "任务"
+        ]
+      },
       "get": {
         "operationId": "get_job_api_v1_jobs__job_id__get",
         "parameters": [
@@ -3593,6 +3841,129 @@
         ]
       }
     },
+    "/api/v1/trash": {
+      "get": {
+        "operationId": "list_trash_api_v1_trash_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "回收站中的课程与课次",
+        "tags": [
+          "回收站"
+        ]
+      }
+    },
+    "/api/v1/trash/{kind}/{item_id}": {
+      "delete": {
+        "operationId": "purge_trash_api_v1_trash__kind___item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "立即永久删除回收站中的项目",
+        "tags": [
+          "回收站"
+        ]
+      }
+    },
+    "/api/v1/trash/{kind}/{item_id}/restore": {
+      "post": {
+        "operationId": "restore_trash_api_v1_trash__kind___item_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "从回收站恢复课程或课次",
+        "tags": [
+          "回收站"
+        ]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "operationId": "list_users_api_v1_users_get",
@@ -3699,7 +4070,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "停用或启用用户（管理员）",
+        "summary": "停用、启用、改角色或重置口令（管理员）",
         "tags": [
           "账号"
         ]

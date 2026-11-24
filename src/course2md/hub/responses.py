@@ -291,10 +291,27 @@ class Ok(_Model):
     ok: bool = True
 
 
+class TrashItem(_Model):
+    kind: str = "course"  # course 或 job
+    id: str
+    title: str = ""
+    course: str = ""
+    deleted_at: float = 0.0
+    purge_at: float = 0.0
+    job_count: int = 0
+
+
+class TrashResponse(_Model):
+    items: list[TrashItem] = []
+    retention_days: int = 30
+    removes_files: bool = False
+
+
 class AuthStatus(_Model):
     mode: str = "local"
     registration: str = "closed"
     has_users: bool = True
+    needs_setup: bool = False
 
 
 class UserResponse(_Model):

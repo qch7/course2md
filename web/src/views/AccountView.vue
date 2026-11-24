@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { useQuery } from "@tanstack/vue-query";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { client, unwrap } from "@/api/client";
 import { isAdmin, resetSession, session } from "@/stores/session";
 import { showError, toast, ui } from "@/stores/ui";
-import { dateTime } from "@/utils/format";
 
 const router = useRouter();
 const server = computed(() => session.mode === "server");
@@ -14,12 +12,6 @@ const oldPassword = ref("");
 const newPassword = ref("");
 const tokenName = ref("");
 const apiToken = ref("");
-const newUser = ref({ username: "", password: "", role: "user" });
-const users = useQuery({
-  queryKey: ["users"],
-  queryFn: () => unwrap(client.GET("/api/v1/users")),
-  enabled: computed(() => server.value && isAdmin()),
-});
 
 async function changePassword(): Promise<void> {
   try {
@@ -40,28 +32,6 @@ async function createToken(): Promise<void> {
     apiToken.value = (
       await unwrap(client.POST("/api/v1/auth/tokens", { body: { name: tokenName.value || "API 令牌" } }))
     ).token;
-  } catch (error) {
-    showError(error);
-  }
-}
-
-async function createUser(): Promise<void> {
-  try {
-    await unwrap(client.POST("/api/v1/users", { body: newUser.value }));
-    toast(`已创建 ${newUser.value.username}`);
-    newUser.value = { username: "", password: "", role: "user" };
-    users.refetch();
-  } catch (error) {
-    showError(error);
-  }
-}
-
-async function setDisabled(id: string, disabled: boolean): Promise<void> {
-  try {
-    await unwrap(
-      client.PATCH("/api/v1/users/{user_id}", { params: { path: { user_id: id } }, body: { disabled } }),
-    );
-    users.refetch();
   } catch (error) {
     showError(error);
   }
@@ -127,50 +97,8 @@ async function logout(): Promise<void> {
           <code v-if="apiToken" class="copyable">{{ apiToken }}</code>
         </section>
         <section v-if="isAdmin()" class="panel">
-          <h3>用户</h3>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>用户名</th>
-                <th>角色</th>
-                <th>创建时间</th>
-                <th>状态</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="user in users.data.value?.users ?? []" :key="user.id">
-                <td>{{ user.username }}</td>
-                <td>{{ user.role === "admin" ? "管理员" : "用户" }}</td>
-                <td>{{ dateTime(user.created_at) }}</td>
-                <td>{{ user.disabled ? "已停用" : "正常" }}</td>
-                <td>
-                  <button
-                    v-if="user.id !== session.user?.id"
-                    class="quiet-button small"
-                    @click="setDisabled(user.id, !user.disabled)"
-                  >
-                    {{ user.disabled ? "启用" : "停用" }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <form class="inline-form" @submit.prevent="createUser">
-            <label class="field compact"><span>用户名</span><input v-model="newUser.username" /></label>
-            <label class="field compact"
-              ><span>初始口令</span
-              ><input v-model="newUser.password" type="password" autocomplete="new-password"
-            /></label>
-            <label class="field compact"
-              ><span>角色</span
-              ><select v-model="newUser.role">
-                <option value="user">用户</option>
-                <option value="admin">管理员</option>
-              </select></label
-            >
-            <button class="primary-button">创建用户</button>
-          </form>
+          <h3>管理</h3>
+          <p>创建用户、修改角色、停用账号与重置口令，请前往<RouterLink to="/admin">管理页</RouterLink>。</p>
         </section>
       </template>
     </div>

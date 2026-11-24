@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, or_, select, update
+from sqlalchemy import CursorResult, delete, or_, select, update
 
 from ..storage import ArtifactStore, canonical_json
 from .crypto import TASK_FIELDS, FieldCipher
@@ -290,11 +290,28 @@ class TaskQueue:
                 for row in rows
             ]
 
-    def capable_worker_online(self, requires: list[str], affinity: str | None = None) -> bool:
+    def capable_worker_online(
+        self, requires: list[str], affinity: str | None = None, owner_id: str | None = None
+    ) -> bool:
+        """owner_id 为任务所属用户时，只计入能领取该任务的节点（共享节点与该用户的个人节点）。"""
         return any(
-            item["online"] and satisfies(item["capabilities"], requires) and (not affinity or item["id"] == affinity)
+            item["online"]
+            and satisfies(item["capabilities"], requires)
+            and (not affinity or item["id"] == affinity)
+            and (owner_id is None or item["owner_id"] in (None, owner_id))
             for item in self.workers()
         )
+
+    # ------------------------------------------------------------ 清理
+    def discard_job(self, job_id: str) -> int:
+        """删除某个任务的全部阶段记录、运行输出与产物记录（产物内容按摘要共享，不在此删除）。"""
+        with self.db.session() as session:
+            ids = list(session.scalars(select(TaskRow.id).where(TaskRow.job_id == job_id)))
+            if ids:
+                session.execute(delete(TaskEventRow).where(TaskEventRow.task_id.in_(ids)))
+                session.execute(delete(ArtifactRow).where(ArtifactRow.task_id.in_(ids)))
+                session.execute(delete(TaskRow).where(TaskRow.id.in_(ids)))
+            return len(ids)
 
     # ------------------------------------------------------------ 领取与租约
     def claim(
