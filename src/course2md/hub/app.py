@@ -217,8 +217,8 @@ def serve(host: str = "127.0.0.1", port: int = DEFAULT_PORT, open_browser: bool 
     print("\n已停止")
 
 
-def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> None:
-    """服务器形态：需要登录，按用户隔离；转写通常由远程计算节点承担。"""
+def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT, with_node: bool = False) -> None:
+    """服务器形态：默认以纯 Hub 运行（需要登录、按用户隔离），计算任务由连入的节点承担。"""
     import os
 
     import uvicorn
@@ -237,7 +237,7 @@ def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> None:
         )
     FieldCipher.from_env()  # 缺少 cryptography 时尽早报错
     bootstrap_runtime()
-    manager = JobManager(database_url=env("COURSE2MD_DATABASE_URL"))
+    manager = JobManager(database_url=env("COURSE2MD_DATABASE_URL"), builtin_worker=with_node)
     manager.mode = "server"
     manager.hub_links.default_work_dir = (manager.data_dir / "hub-links").resolve()
     manager.start_hub_links(
@@ -258,7 +258,8 @@ def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> None:
             f"    {setup_token}\n\n"
             "令牌仅在本次运行内有效，创建成功后立即作废；重启服务会生成新的令牌。\n" + "=" * 64 + "\n"
         )
-    print(f"course2md 服务器已启动：http://{host}:{port}（数据库 {manager.store.db.url.split('@')[-1]}）")
+    mode_hint = "含本机节点" if with_node else "纯 Hub，需连接计算节点"
+    print(f"course2md 服务器已启动：http://{host}:{port}（{mode_hint}，数据库 {manager.store.db.url.split('@')[-1]}）")
     try:
         uvicorn.run(
             app,

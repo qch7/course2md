@@ -16,7 +16,6 @@ from course2md.refine.lesson import NotePair
 from course2md.resolvers.base import MediaRef
 from course2md.stages import media as media_stage
 from course2md.util.job_refs import from_job_refs, to_job_refs
-from course2md.worker import WorkerRunner
 from course2md.worker.client import HttpTransport, HubError, RemoteWorker
 from live_server import LiveServer
 
@@ -62,8 +61,8 @@ def deployment(tmp_path, monkeypatch):
     monkeypatch.setattr(lesson, "build_note_pair", build_notes)
     monkeypatch.setenv("COURSE2MD_OUT_DIR", str(tmp_path / "hub"))
 
+    # 纯 Hub（无内置节点）：output 由 Hub 自身落盘，全部重计算由远程节点完成
     manager = server.JobManager(tmp_path / "hub" / ".course2md" / "workspace.sqlite3", builtin_worker=False)
-    hub_worker = WorkerRunner(manager.queue, {"hub"}, worker_id="builtin", poll_interval=0.02).start()
     live = LiveServer(create_app(manager, bind_host="127.0.0.1"))
     base = f"http://127.0.0.1:{live.port}"
     worker_id, token = manager.queue.create_worker_token("个人电脑")
@@ -86,7 +85,6 @@ def deployment(tmp_path, monkeypatch):
         node_dir=node_dir,
     )
     node.stop()
-    hub_worker.stop()
     live.stop()
     manager.close()
 
@@ -106,7 +104,7 @@ def test_remote_node_transcribes_and_files_return_to_hub(deployment):
         item["id"]: item for item in requests.get(f"{deployment.base}/api/v1/workers", timeout=5).json()["workers"]
     }
     assert workers[deployment.worker_id]["kind"] == "remote" and workers[deployment.worker_id]["online"]
-    assert "asr" not in workers["builtin"]["capabilities"]
+    assert "builtin" not in workers
 
     response = requests.post(
         f"{deployment.base}/api/v1/jobs",
@@ -123,7 +121,7 @@ def test_remote_node_transcribes_and_files_return_to_hub(deployment):
     }
     assert tasks["media"]["worker_id"] == tasks["frames"]["worker_id"] == deployment.worker_id
     assert tasks["organize"]["worker_id"] == deployment.worker_id
-    assert tasks["output"]["worker_id"] == "builtin"
+    assert tasks["output"]["worker_id"] == "hub"
 
     hub_job = deployment.hub_dir.joinpath(*job["out_dir"].split("hub", 1)[1].strip("\\/").replace("\\", "/").split("/"))
     assert (hub_job / "frames" / "lecture_00-00-05.jpg").read_bytes() == b"jpeg-from-node"

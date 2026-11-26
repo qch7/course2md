@@ -74,7 +74,12 @@ def test_queue_run_matches_local_outputs(hub):
     assert result.detailed_notes.read_text(encoding="utf-8") == "# 详细版 1\n"
     tasks = hub.queue.tasks_for_job("job")
     assert [task["stage"] for task in tasks] == ["media", "output", "organize"]
-    assert all(task["status"] == "done" and task["worker_id"] == "builtin" for task in tasks)
+    assert all(task["status"] == "done" for task in tasks)
+    assert {task["stage"]: task["worker_id"] for task in tasks} == {
+        "media": "builtin",
+        "output": "hub",
+        "organize": "builtin",
+    }
     assert tasks[0]["requires"] == ["asr"]  # 替身解析器没有登记名称
     assert ("整理", pytest.approx(0.84), "整理中", 0.5) in progress
     assert events == [{"type": "text", "text": "Agent 输出"}]

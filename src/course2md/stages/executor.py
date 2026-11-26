@@ -106,6 +106,40 @@ class QueueExecutor:
                 self._remember_anchor(stage.name, previous)
                 return decode(self.queue.output(previous))
         declared = stage_type(stage.name)
+        if declared.hub_only:
+            started_at = time.time()
+            before_warnings = len(ctx.warnings)
+            last_progress: tuple[str, float, str] = (declared.display_name(), 0.0, "")
+
+            def _track_progress(stage_name: str, fraction: float, message: str, sub: float | None = None) -> None:
+                nonlocal last_progress
+                last_progress = (stage_name, fraction, message)
+                ctx.progress(stage_name, fraction, message, sub)
+
+            hub_ctx = StageContext(
+                options=ctx.options,
+                progress=_track_progress,
+                cancel=ctx.cancel,
+                on_output=ctx.on_output,
+                warnings=ctx.warnings,
+            )
+            result = stage.run(hub_ctx, inputs)
+            task_id = self.queue.record_hub_task(
+                self.job_id,
+                stage.name,
+                {"options": options, "inputs": encoded, "run_id": self.run_id},
+                encode(result),
+                cache_key=key,
+                warnings=ctx.warnings[before_warnings:],
+                model=declared.model(ctx.options),
+                owner_id=self.owner_id,
+                started_at=started_at,
+                progress_stage=last_progress[0],
+                progress_fraction=last_progress[1],
+                progress_message=last_progress[2],
+            )
+            self.task_ids.append(task_id)
+            return result
         affinity = self.media_worker if declared.pinned_to_anchor else None
         requires = requires_for(stage.name, ctx.options, inputs)
         if affinity and not self.queue.capable_worker_online(requires, affinity):

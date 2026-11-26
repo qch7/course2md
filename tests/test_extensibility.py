@@ -122,6 +122,7 @@ def test_every_stage_declares_its_scheduling_contract():
     anchors = [name for name, stage in STAGE_TYPES.items() if stage.anchors_node]
     assert anchors == ["media"]
     assert [name for name, stage in STAGE_TYPES.items() if stage.pinned_to_anchor] == ["frames"]
+    assert [name for name, stage in STAGE_TYPES.items() if stage.hub_only] == ["output"]
 
 
 def test_cache_key_only_depends_on_declared_options(tmp_path):

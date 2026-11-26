@@ -44,6 +44,7 @@ def local_app(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(lesson, "build_note_pair", build_notes)
     monkeypatch.setenv("COURSE2MD_OUT_DIR", str(tmp_path / "out"))
+    monkeypatch.setenv("COURSE2MD_API_KEY", "test-key")
 
     manager = server.JobManager(tmp_path / "out" / ".course2md" / "workspace.sqlite3")
     manager.builtin_worker.poll_interval = 0.02
@@ -79,7 +80,12 @@ def test_job_runs_through_builtin_worker_and_reruns_organize(local_app):
     _wait(client, job_id)
     tasks = client.get(f"/api/v1/jobs/{job_id}/tasks").json()["tasks"]
     assert [task["stage"] for task in tasks] == ["media", "output", "organize"]
-    assert all(task["worker_id"] == "builtin" and "payload" not in task for task in tasks)
+    assert all("payload" not in task for task in tasks)
+    assert {task["stage"]: task["worker_id"] for task in tasks} == {
+        "media": "builtin",
+        "output": "hub",
+        "organize": "builtin",
+    }
 
     response = client.post(f"/api/v1/jobs/{job_id}/rerun", json={"from_stage": "organize", "agent": "dsh"})
     assert response.status_code == 200, response.text

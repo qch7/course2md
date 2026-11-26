@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 from ..asr.formats import Segment, merge_paragraphs, to_json, to_markdown, to_srt, to_txt, to_vtt
+from ..util.text import ensure_dir
 from .artifacts import Transcript, TranscriptFiles
 from .base import BaseStage, StageContext
-
-if TYPE_CHECKING:
-    from .options import JobOptions
 
 TRANSCRIPT_FORMATS = ("srt", "vtt", "txt", "md", "json")
 
@@ -26,13 +24,11 @@ class OutputStage(BaseStage[list[Transcript], list[TranscriptFiles]]):
     name: ClassVar[str] = "output"
     label: ClassVar[str] = "输出"
     cache_options: ClassVar[tuple[str, ...] | None] = ("out_dir", "formats")
-
-    @classmethod
-    def requires(cls, options: JobOptions, inputs: list[Transcript] | None = None) -> list[str]:
-        return ["hub"]  # 转写文件写进 Hub 的输出目录
+    hub_only: ClassVar[bool] = True
 
     def run(self, ctx: StageContext, inputs: list[Transcript]) -> list[TranscriptFiles]:
         options = ctx.options
+        ensure_dir(options.out_dir)
         results: list[TranscriptFiles] = []
         for index, item in enumerate(inputs, 1):
             meta = dict(item.meta)

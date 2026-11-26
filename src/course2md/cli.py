@@ -323,7 +323,7 @@ def cmd_worker_token(args) -> int:
 def cmd_server(args) -> int:
     from .hub.app import serve_server
 
-    serve_server(host=args.host, port=args.port)
+    serve_server(host=args.host, port=args.port, with_node=args.with_node)
     return 0
 
 
@@ -432,6 +432,7 @@ def build_parser() -> argparse.ArgumentParser:
     server = sub.add_parser("server", help="以服务器形态启动 Hub（需要登录、按用户隔离，通常放在 HTTPS 反向代理之后）")
     server.add_argument("--host", default="0.0.0.0")
     server.add_argument("--port", type=int, default=8765)
+    server.add_argument("--with-node", action="store_true", help="同时在本机启用内置计算节点（单机带算力的服务器使用）")
     server.set_defaults(func=cmd_server)
 
     web = sub.add_parser("web", help="启动本地图形界面")

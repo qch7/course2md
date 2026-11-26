@@ -17,16 +17,12 @@ if TYPE_CHECKING:
 
 
 def resolver_requires(source: str) -> list[str]:
-    """处理该来源所需的节点能力。本地文件只存在于 Hub 所在电脑，由内置节点处理。
-
-    其它来源要求 ``node``（独立节点）：Hub 的内置节点也可能装了同一个解析插件，
-    但 Hub 正是因为可能访问不了课程平台才把解析交给节点，不能让它抢走任务。
-    """
+    """处理该来源所需的节点能力。本地文件只存在于 Hub 所在电脑，需由同机节点处理。"""
     try:
         name = get_resolver(source).name
     except Exception:  # noqa: BLE001  解析器缺失时仍允许排队，执行时报告原因
-        return ["node"]
-    return ["resolver:local", "hub"] if name == "local" else [f"resolver:{name}", "node"]
+        return []
+    return ["resolver:local", "hub"] if name == "local" else [f"resolver:{name}"]
 
 
 class SessionsStage(BaseStage[None, SessionList]):

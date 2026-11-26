@@ -39,7 +39,7 @@ def node(hub, monkeypatch):  # noqa: F811
     fake = SimpleNamespace(name="fakeclass", list_sessions=list_sessions)
     monkeypatch.setattr("course2md.stages.sessions.get_resolver", lambda source: fake)
 
-    def start(worker_id="node-a", owner=None, capabilities=("resolver:fakeclass", "node")):
+    def start(worker_id="node-a", owner=None, capabilities=("resolver:fakeclass",)):
         if owner:
             worker_id, _token = hub.manager.queue.create_worker_token("个人节点", owner_id=owner)
         runner = WorkerRunner(
@@ -75,21 +75,41 @@ def test_resolve_runs_on_a_node_instead_of_the_hub(hub, node):  # noqa: F811
         assert not session.scalars(select(TaskRow).where(TaskRow.stage == "sessions")).all()
 
 
-def test_the_hubs_own_worker_never_takes_session_listing(hub, node):  # noqa: F811
-    """内置节点同样装了解析插件，但 Hub 可能访问不了该平台，列课次只能由独立节点执行。"""
+def test_worker_without_resolver_never_takes_session_listing(hub, node):  # noqa: F811
+    """不具备对应 resolver 能力的节点不会领取课次解析任务。"""
     admin = hub.client()
     register_first_admin(admin, "teacher")
-    node.start(worker_id="builtin-like", capabilities=("resolver:fakeclass", "hub", "agent:custom"))
+    node.start(worker_id="no-resolver", capabilities=("asr", "llm-api"))
     response = admin.post("/api/v1/resolve", json={"source": SECRET_SOURCE})
-    assert response.status_code == 400 and "node" in response.json()["error"]
+    assert response.status_code == 400 and "resolver:fakeclass" in response.json()["error"]
     assert node.calls == []
 
 
-def test_independent_nodes_advertise_the_node_capability():
+def test_capabilities_detect_llm_api_accurately_and_drop_node_pseudo_cap(monkeypatch):
     from course2md.worker import detect_capabilities
 
-    assert "node" in detect_capabilities(agents=False)
-    assert "node" not in detect_capabilities(hub=True, agents=False)
+    for key in ("COURSE2MD_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "COURSE2MD_LLM_BASE"):
+        monkeypatch.delenv(key, raising=False)
+    caps_no_key = detect_capabilities(agents=False)
+    assert "node" not in caps_no_key
+    assert "hub" not in caps_no_key
+    assert "llm-api" not in caps_no_key
+    assert "hub" in detect_capabilities(hub=True, agents=False)
+
+    monkeypatch.setenv("COURSE2MD_LLM_BASE", "http://127.0.0.1:11434/v1")
+    assert "llm-api" in detect_capabilities(agents=False)
+
+    monkeypatch.delenv("COURSE2MD_LLM_BASE", raising=False)
+    monkeypatch.setenv("COURSE2MD_API_KEY", "sk-test")
+    assert "llm-api" in detect_capabilities(agents=False)
+
+
+def test_server_cli_defaults_to_pure_hub_and_supports_with_node():
+    from course2md.cli import build_parser
+
+    parser = build_parser()
+    assert parser.parse_args(["server"]).with_node is False
+    assert parser.parse_args(["server", "--with-node"]).with_node is True
 
 
 def test_node_resolution_failures_are_reported_as_resolver_errors(hub, node):  # noqa: F811

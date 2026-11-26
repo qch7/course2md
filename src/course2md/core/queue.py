@@ -134,6 +134,74 @@ class TaskQueue:
             )
         return task_id
 
+    def record_hub_task(
+        self,
+        job_id: str,
+        stage: str,
+        payload: dict[str, Any],
+        output: Any,
+        *,
+        cache_key: str = "",
+        warnings: list[str] | None = None,
+        model: str = "",
+        owner_id: str | None = None,
+        started_at: float | None = None,
+        progress_stage: str = "",
+        progress_fraction: float = 0.0,
+        progress_message: str = "",
+    ) -> str:
+        """记录由 Hub 直接执行的轻量阶段（hub_only）及其产物，供阶段历史与缓存复用。"""
+        data = canonical_json(output)
+        digest = self.store.put_bytes(data)
+        now = _now()
+        started = now if started_at is None else started_at
+        task_id = uuid.uuid4().hex
+        with self.db.session() as session:
+            session.add(
+                TaskRow(
+                    id=task_id,
+                    job_id=job_id,
+                    owner_id=owner_id,
+                    stage=stage,
+                    status="done",
+                    requires=[],
+                    affinity=None,
+                    worker_id="hub",
+                    payload=self.cipher.map_fields(payload, TASK_FIELDS, encrypt=True),
+                    cache_key=cache_key,
+                    result=digest,
+                    warnings=list(warnings or []),
+                    error="",
+                    error_type="",
+                    attempts=1,
+                    max_attempts=1,
+                    cancel_requested=False,
+                    progress_stage=progress_stage,
+                    progress_fraction=progress_fraction,
+                    progress_message=progress_message,
+                    progress_seq=1 if progress_stage or progress_message else 0,
+                    created_at=started,
+                    updated_at=now,
+                    started_at=started,
+                    finished_at=now,
+                )
+            )
+            kind = output.get("kind", "") if isinstance(output, dict) else "list"
+            session.add(
+                ArtifactRow(
+                    digest=digest,
+                    kind=str(kind),
+                    job_id=job_id,
+                    task_id=task_id,
+                    stage=stage,
+                    worker_id="hub",
+                    model=model,
+                    size=len(data),
+                    created_at=now,
+                )
+            )
+        return task_id
+
     def get(self, task_id: str) -> dict[str, Any] | None:
         with self.db.session() as session:
             row = session.get(TaskRow, task_id)

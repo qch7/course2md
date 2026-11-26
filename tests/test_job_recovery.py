@@ -8,6 +8,7 @@ from course2md.stages.base import StageContext
 from course2md.stages.codec import cache_key, options_to_dict
 from course2md.stages.executor import QueueExecutor, Suspended
 from course2md.stages.output import OutputStage
+from course2md.stages.proofread import ProofreadStage
 
 
 def test_waiting_course_does_not_block_another_course(tmp_path, monkeypatch):
@@ -72,7 +73,7 @@ def test_shutdown_suspends_wait_without_cancelling_remote_task(tmp_path):
     stop.set()
     try:
         try:
-            executor.run(OutputStage(), StageContext(options), None)
+            executor.run(ProofreadStage(), StageContext(options), None)
         except Suspended:
             pass
         else:

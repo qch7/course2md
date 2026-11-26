@@ -69,6 +69,7 @@ class BaseStage(Generic[In, Out]):
     anchors_node     执行它的节点成为本任务的“媒体节点”（持有原视频）
     pinned_to_anchor 必须在媒体节点上运行（需要读取原视频）；节点离线时按
                      :meth:`fallback_requires` 交给其它节点
+    hub_only         轻量的落盘/物化阶段，由 Hub 直接在本机输出目录执行，不经节点队列领取
     """
 
     name: ClassVar[str]
@@ -76,6 +77,7 @@ class BaseStage(Generic[In, Out]):
     cache_options: ClassVar[tuple[str, ...] | None] = None
     anchors_node: ClassVar[bool] = False
     pinned_to_anchor: ClassVar[bool] = False
+    hub_only: ClassVar[bool] = False
 
     @classmethod
     def create(cls, **_resources: Any) -> BaseStage[In, Out]:
