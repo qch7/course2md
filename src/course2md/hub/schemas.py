@@ -131,6 +131,7 @@ class TransferPushRequest(_Body):
     course_id: str | None = Field(None, description="要推送的课程编号")
     job_ids: list[str] | None = Field(None, description="要推送的课次任务编号列表")
     conflict: str = Field("skip", description="冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）")
+    include_cache: bool = Field(False, description="同时带上各阶段缓存，对端导入后可从中间阶段重新运行")
 
 
 class TransferPullRequest(_Body):
@@ -140,4 +141,5 @@ class TransferPullRequest(_Body):
     course_id: str | None = Field(None, description="要拉取的对端课程编号")
     job_ids: list[str] | None = Field(None, description="要拉取的对端课次任务编号列表")
     conflict: str = Field("skip", description="冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）")
+    include_cache: bool = Field(False, description="同时带回对端的各阶段缓存，导入后可从中间阶段重新运行")
     out_dir: str | None = Field(None, description="本地模式可选输出根目录")

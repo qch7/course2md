@@ -78,13 +78,16 @@ export function fileUrl(jobId: string, rel: string, inline = false): string {
   return `/api/v1/jobs/${encodeURIComponent(jobId)}/file?${query}`;
 }
 
-export function jobBundleUrl(jobId: string): string {
-  return `/api/v1/jobs/${encodeURIComponent(jobId)}/bundle`;
+export function jobBundleUrl(jobId: string, includeCache = false): string {
+  const query = includeCache ? "?include_cache=true" : "";
+  return `/api/v1/jobs/${encodeURIComponent(jobId)}/bundle${query}`;
 }
 
-export function courseBundleUrl(courseId: string, jobIds?: string[]): string {
-  const query = jobIds?.length ? `?job_ids=${encodeURIComponent(jobIds.join(","))}` : "";
-  return `/api/v1/courses/${encodeURIComponent(courseId)}/bundle${query}`;
+export function courseBundleUrl(courseId: string, jobIds?: string[], includeCache = false): string {
+  const params: string[] = [];
+  if (jobIds?.length) params.push(`job_ids=${encodeURIComponent(jobIds.join(","))}`);
+  if (includeCache) params.push("include_cache=true");
+  return `/api/v1/courses/${encodeURIComponent(courseId)}/bundle${params.length ? `?${params.join("&")}` : ""}`;
 }
 
 export async function importBundle(

@@ -2884,6 +2884,12 @@ export interface components {
        */
       hub_url?: string | null;
       /**
+       * Include Cache
+       * @description 同时带回对端的各阶段缓存，导入后可从中间阶段重新运行
+       * @default false
+       */
+      include_cache: boolean;
+      /**
        * Job Ids
        * @description 要拉取的对端课次任务编号列表
        */
@@ -2924,6 +2930,12 @@ export interface components {
        * @description 临时指定的目标 Hub 地址
        */
       hub_url?: string | null;
+      /**
+       * Include Cache
+       * @description 同时带上各阶段缓存，对端导入后可从中间阶段重新运行
+       * @default false
+       */
+      include_cache: boolean;
       /**
        * Job Ids
        * @description 要推送的课次任务编号列表
@@ -3621,6 +3633,8 @@ export interface operations {
       query?: {
         /** @description 逗号分隔的课次任务编号；留空导出全部已完成课次 */
         job_ids?: string;
+        /** @description 同时带上各阶段缓存，导入后可从中间阶段重新运行 */
+        include_cache?: boolean;
       };
       header?: never;
       path: {
@@ -3993,7 +4007,10 @@ export interface operations {
   };
   export_job_bundle_api_v1_jobs__job_id__bundle_get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description 同时带上各阶段缓存，导入后可从中间阶段重新运行 */
+        include_cache?: boolean;
+      };
       header?: never;
       path: {
         job_id: string;

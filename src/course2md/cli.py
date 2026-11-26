@@ -170,9 +170,11 @@ def cmd_transfer(args) -> int:
             target = Path(args.out).expanduser().resolve()
             with RemoteHubClient(args.hub, args.token or "") as remote:
                 if args.course:
-                    remote.download_course_bundle(args.course, target, job_ids=args.job or None)
+                    remote.download_course_bundle(
+                        args.course, target, job_ids=args.job or None, include_cache=args.with_cache
+                    )
                 else:
-                    remote.download_job_bundle(args.job[0], target)
+                    remote.download_job_bundle(args.job[0], target, include_cache=args.with_cache)
             print(f"产物包已导出：{target}（{target.stat().st_size / 1024:.0f} KB）")
             return 0
 
@@ -200,7 +202,9 @@ def cmd_transfer(args) -> int:
                     os.close(fd)
                     tmp_path = Path(tmp_name)
                     try:
-                        src.download_course_bundle(args.course, tmp_path, job_ids=args.job or None)
+                        src.download_course_bundle(
+                            args.course, tmp_path, job_ids=args.job or None, include_cache=args.with_cache
+                        )
                         res = dst.push_bundle(tmp_path, conflict=args.conflict)
                         imported.extend(res.get("imported") or [])
                         overwritten.extend(res.get("overwritten") or [])
@@ -213,7 +217,7 @@ def cmd_transfer(args) -> int:
                         os.close(fd)
                         tmp_path = Path(tmp_name)
                         try:
-                            src.download_job_bundle(jid, tmp_path)
+                            src.download_job_bundle(jid, tmp_path, include_cache=args.with_cache)
                             res = dst.push_bundle(tmp_path, conflict=args.conflict)
                             imported.extend(res.get("imported") or [])
                             overwritten.extend(res.get("overwritten") or [])
@@ -569,6 +573,9 @@ def build_parser() -> argparse.ArgumentParser:
     t_export.add_argument("--course", default="", help="要导出的课程编号")
     t_export.add_argument("--job", action="append", default=[], help="要导出的课次任务编号（可重复）")
     t_export.add_argument("-o", "--out", required=True, help="输出的 .c2m.zip 路径")
+    t_export.add_argument(
+        "--with-cache", action="store_true", help="同时带上各阶段缓存，导入后可从整理等中间阶段重新运行"
+    )
     t_export.set_defaults(func=cmd_transfer)
 
     t_import = transfer_sub.add_parser("import", help="将产物包（.c2m.zip）导入指定 Hub")
@@ -586,6 +593,9 @@ def build_parser() -> argparse.ArgumentParser:
     t_copy.add_argument("--course", default="", help="要传输的课程编号")
     t_copy.add_argument("--job", action="append", default=[], help="要传输的课次任务编号（可重复）")
     t_copy.add_argument("--conflict", choices=["skip", "overwrite", "copy"], default="skip", help="冲突处理策略")
+    t_copy.add_argument(
+        "--with-cache", action="store_true", help="同时带上各阶段缓存，目标 Hub 可从整理等中间阶段重新运行"
+    )
     t_copy.set_defaults(func=cmd_transfer)
     return parser
 
