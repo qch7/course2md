@@ -22,6 +22,8 @@ from .. import responses as r
 from ..auth import current_user
 from ..schemas import (
     CreateJobRequest,
+    HubLinkCreateRequest,
+    HubLinkUpdateRequest,
     MessageRequest,
     PluginInstallRequest,
     RefreshRequest,
@@ -306,6 +308,45 @@ def delete_worker(
 @router.get("/workers", tags=["计算服务"], summary="计算节点、在线状态与能力", response_model=r.WorkersResponse)
 def list_workers(request: Request, user: CurrentUser) -> dict[str, Any]:
     return {"workers": service.list_workers(_manager(request), user)}
+
+
+@router.get("/hub-links", tags=["计算服务"], summary="本机对外连接的远程 Hub 列表", response_model=r.HubLinksResponse)
+def list_hub_links(request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.list_hub_links(_manager(request), user)
+
+
+@router.post("/hub-links", tags=["计算服务"], summary="添加对外连接的远程 Hub", response_model=r.HubLinkResponse)
+def create_hub_link(body: HubLinkCreateRequest, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.create_hub_link(_manager(request), body.payload(), user)
+
+
+@router.patch(
+    "/hub-links/{link_id}", tags=["计算服务"], summary="修改对外连接的远程 Hub 配置", response_model=r.HubLinkResponse
+)
+def update_hub_link(link_id: str, body: HubLinkUpdateRequest, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.update_hub_link(_manager(request), link_id, body.payload(), user)
+
+
+@router.post(
+    "/hub-links/{link_id}/connect", tags=["计算服务"], summary="连接指定的远程 Hub", response_model=r.HubLinkResponse
+)
+def connect_hub_link(link_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.connect_hub_link(_manager(request), link_id, user)
+
+
+@router.post(
+    "/hub-links/{link_id}/disconnect",
+    tags=["计算服务"],
+    summary="断开指定的远程 Hub",
+    response_model=r.HubLinkResponse,
+)
+def disconnect_hub_link(link_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.disconnect_hub_link(_manager(request), link_id, user)
+
+
+@router.delete("/hub-links/{link_id}", tags=["计算服务"], summary="删除对外连接的远程 Hub", response_model=r.Ok)
+def delete_hub_link(link_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.delete_hub_link(_manager(request), link_id, user)
 
 
 @router.post("/jobs/{job_id}/cancel", tags=["任务"], summary="取消任务", response_model=r.Ok)

@@ -305,10 +305,12 @@ class JobManager:
                 self.warnings.append(f"任务 {data.get('id', '')} 读取失败（{exc}）")
         self.queue = TaskQueue(self.store.db, LocalFileStore(data_dir / "objects"))
         self.versions = NoteVersions(self.store.db, self.queue.store)
+        from ..worker import HubLinkManager, WorkerRunner, detect_capabilities
+
+        self._worker_resources: dict = {}
+        self._worker_exec_lock = threading.Lock()
         self.builtin_worker = None
         if builtin_worker:
-            from ..worker import WorkerRunner, detect_capabilities
-
             self.builtin_worker = WorkerRunner(
                 self.queue,
                 detect_capabilities(hub=True),
@@ -316,7 +318,15 @@ class JobManager:
                 name="内置节点",
                 kind="builtin",
                 poll_interval=0.2,
+                resources=self._worker_resources,
+                exec_lock=self._worker_exec_lock,
             ).start()
+        self.hub_links = HubLinkManager(
+            data_dir / "hub-links.json",
+            resources=self._worker_resources,
+            exec_lock=self._worker_exec_lock,
+            default_work_dir=Path.cwd() / "course2md-worker",
+        )
         self._worker = threading.Thread(target=self._dispatch, daemon=True)
         self._worker.start()
         for job in list(self.jobs.values()):
@@ -486,6 +496,12 @@ class JobManager:
     def get(self, job_id: str) -> Job | None:
         return self.jobs.get(job_id)
 
+    def start_hub_links(self, local_origins: set[str] | None = None) -> list[str]:
+        """同步环境变量并启动自动连接的外部 Hub（网状节点）。"""
+        if local_origins:
+            self.hub_links.set_local_origins(local_origins)
+        return self.hub_links.start_auto()
+
     def close(self) -> None:
         """暂停编排，保留未完成任务供重启后接续。"""
         self._closing.set()
@@ -493,6 +509,9 @@ class JobManager:
         self._worker.join(timeout=15)
         for thread in list(self._runners.values()):
             thread.join(timeout=5)
+        hub_links = getattr(self, "hub_links", None)
+        if hub_links is not None:
+            hub_links.close()
         builtin = getattr(self, "builtin_worker", None)
         if builtin is not None:
             builtin.stop()

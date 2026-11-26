@@ -196,7 +196,12 @@ def serve(host: str = "127.0.0.1", port: int = DEFAULT_PORT, open_browser: bool 
             return
         actual = server.servers[0].sockets[0].getsockname()[1] if server.servers else port
         url = f"http://{host}:{actual}"
+        started = manager.start_hub_links(
+            local_origins={url, f"http://127.0.0.1:{actual}", f"http://localhost:{actual}"}
+        )
         print(f"course2md 界面已启动：{url}（Ctrl+C 退出）")
+        if started:
+            print(f"已自动连接 {len(started)} 个外部 Hub（可在「计算服务」页查看状态）")
         if open_browser:
             webbrowser.open(url)
 
@@ -234,6 +239,10 @@ def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> None:
     bootstrap_runtime()
     manager = JobManager(database_url=env("COURSE2MD_DATABASE_URL"))
     manager.mode = "server"
+    manager.hub_links.default_work_dir = (manager.data_dir / "hub-links").resolve()
+    manager.start_hub_links(
+        local_origins={f"http://{host}:{port}", f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+    )
     for error in load_errors():
         manager.warnings.append(error)
         print(error)

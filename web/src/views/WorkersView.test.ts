@@ -151,3 +151,130 @@ describe("worker deletion", () => {
     expect(ui.toast).toBe("节点已停用");
   });
 });
+
+describe("mesh hub links", () => {
+  let wrapper: VueWrapper;
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    session.mode = "local";
+    session.user = { id: "local", username: "本机", role: "admin", disabled: false };
+    ui.error = "";
+    ui.toast = "";
+    vi.spyOn(client, "GET").mockImplementation((path: string) => {
+      if (path === "/api/v1/hub-links") {
+        return Promise.resolve({
+          data: {
+            can_manage: true,
+            capabilities: ["asr", "frames", "node"],
+            default_name: "LAPTOP-TEST",
+            default_work_dir: "D:\\course2md-worker",
+            links: [
+              {
+                id: "link-1",
+                hub_url: "https://course.huaiyu.me",
+                name: "LAPTOP-TEST",
+                work_dir: "D:\\course2md-worker",
+                has_token: true,
+                token_hint: "c2m_…abcd",
+                auto_connect: true,
+                no_agents: false,
+                without: [],
+                source: "env",
+                status: "online",
+                worker_id: "node-1234",
+                capabilities: ["asr", "node"],
+                last_heartbeat: 1700000000,
+                last_error: "",
+                completed_tasks: 2,
+                failed_tasks: 0,
+                logs: ["[20:00:00] 已连接 https://course.huaiyu.me"],
+              },
+            ],
+          },
+          response: new Response(),
+        }) as never;
+      }
+      return Promise.resolve({
+        data: {
+          workers: [
+            worker({ id: "builtin", name: "内置节点", kind: "builtin", disabled: false, online: true }),
+          ],
+        },
+        response: new Response(),
+      }) as never;
+    });
+    vi.spyOn(client, "POST").mockResolvedValue({
+      data: { link: { id: "link-2" } },
+      response: new Response(),
+    } as never);
+    vi.spyOn(client, "DELETE").mockResolvedValue({ data: { ok: true }, response: new Response() });
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    queryClient?.clear();
+    vi.restoreAllMocks();
+  });
+
+  async function render(): Promise<void> {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    wrapper = mount(WorkersView, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } });
+    const dialog = wrapper.find("dialog").element as HTMLDialogElement;
+    dialog.showModal = vi.fn(() => (dialog.open = true));
+    dialog.close = vi.fn((value = "") => {
+      dialog.returnValue = value;
+      dialog.open = false;
+      dialog.dispatchEvent(new Event("close"));
+    });
+    await flushPromises();
+  }
+
+  it("renders the mesh strip, outgoing env hub card, and disconnects cleanly", async () => {
+    await render();
+    expect(wrapper.find(".mesh-strip").text()).toContain("1 / 1 在线");
+    expect(wrapper.find(".hub-link-card").text()).toContain("course.huaiyu.me");
+    expect(wrapper.find(".hub-link-card").text()).toContain("来自 .env");
+    const disconnectBtn = wrapper
+      .find(".hub-link-card")
+      .findAll("button")
+      .find((button) => button.text() === "断开")!;
+    await disconnectBtn.trigger("click");
+    await flushPromises();
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/hub-links/{link_id}/disconnect", {
+      params: { path: { link_id: "link-1" } },
+    });
+    expect(ui.toast).toBe("已断开远程 Hub");
+  });
+
+  it("auto-parses pasted worker CLI commands and submits a new hub link", async () => {
+    await render();
+    const toggleBtn = wrapper.findAll("button").find((button) => button.text() === "+ 连接新 Hub")!;
+    await toggleBtn.trigger("click");
+    const inputs = wrapper.find(".hub-add-form").findAll("input");
+    await inputs[0]!.setValue("course2md worker --hub https://peer.example.com --token c2m_secret999");
+    expect((inputs[0]!.element as HTMLInputElement).value).toBe("https://peer.example.com");
+    expect((inputs[1]!.element as HTMLInputElement).value).toBe("c2m_secret999");
+    await wrapper.find(".hub-add-form").trigger("submit");
+    await flushPromises();
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/hub-links",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          hub_url: "https://peer.example.com",
+          token: "c2m_secret999",
+          auto_connect: true,
+          connect_now: true,
+        }),
+      }),
+    );
+  });
+
+  it("hides mesh outgoing hub controls when user cannot manage links", async () => {
+    session.mode = "server";
+    session.user = { id: "alice", username: "Alice", role: "user", disabled: false };
+    await render();
+    expect(wrapper.find(".mesh-strip").exists()).toBe(false);
+    expect(wrapper.find(".hub-link-card").exists()).toBe(false);
+  });
+});

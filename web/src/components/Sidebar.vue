@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useQuery } from "@tanstack/vue-query";
 import { computed, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -16,6 +17,37 @@ const route = useRoute();
 const router = useRouter();
 const search = ref("");
 const confirmation = ref<InstanceType<typeof ConfirmDialog> | null>(null);
+
+const hubLinks = useQuery({
+  queryKey: ["hub-links"],
+  queryFn: () => unwrap(client.GET("/api/v1/hub-links")),
+  enabled: computed(() => session.mode === "local" || isAdmin()),
+  refetchInterval: 10000,
+});
+
+const meshStatus = computed(() => {
+  const links = hubLinks.data.value?.links ?? [];
+  if (!links.length) return null;
+  const total = links.length;
+  const online = links.filter((item) => item.status === "online" || item.status === "busy").length;
+  if (links.some((item) => item.status === "auth_failed")) {
+    return { cls: "err", badge: "令牌失效", caption: "外部 Hub 令牌失效" };
+  }
+  if (links.some((item) => item.status === "busy")) {
+    return { cls: "busy", badge: `${online}/${total}`, caption: "正在为外部 Hub 执行任务" };
+  }
+  if (online > 0) {
+    return {
+      cls: "on",
+      badge: `${online}/${total}`,
+      caption: total === 1 ? "已连 1 个外部 Hub" : `已连 ${online}/${total} 个外部 Hub`,
+    };
+  }
+  if (links.some((item) => item.status === "connecting" || item.status === "reconnecting")) {
+    return { cls: "warn", badge: "重连中", caption: "正在连接外部 Hub" };
+  }
+  return { cls: "", badge: `0/${total}`, caption: "外部 Hub 未连接" };
+});
 
 function loadFolders(): Record<string, boolean> {
   try {
@@ -222,7 +254,10 @@ async function removeGroup(group: Group): Promise<void> {
     </nav>
     <nav class="sidebar-nav" aria-label="管理">
       <RouterLink to="/trash" @click="ui.sidebarOpen = false"><AppIcon name="trash" />回收站</RouterLink>
-      <RouterLink to="/workers" @click="ui.sidebarOpen = false"><AppIcon name="server" />计算服务</RouterLink>
+      <RouterLink to="/workers" @click="ui.sidebarOpen = false">
+        <AppIcon name="server" />计算服务
+        <span v-if="meshStatus" class="nav-badge" :class="meshStatus.cls">{{ meshStatus.badge }}</span>
+      </RouterLink>
       <RouterLink to="/plugins" @click="ui.sidebarOpen = false"><AppIcon name="puzzle" />插件</RouterLink>
       <RouterLink to="/account" @click="ui.sidebarOpen = false"><AppIcon name="user" />账号</RouterLink>
       <RouterLink v-if="session.mode === 'server' && isAdmin()" to="/admin" @click="ui.sidebarOpen = false"
@@ -237,8 +272,14 @@ async function removeGroup(group: Group): Promise<void> {
         <span
           ><strong>{{ session.mode === "server" ? session.user?.username : "本地工作区" }}</strong
           ><small
-            ><i class="online-dot"></i
-            >{{ session.mode === "server" ? "个人学习空间" : "在自己的节奏里学习" }}</small
+            ><i class="online-dot" :class="session.mode === 'local' && meshStatus ? meshStatus.cls : ''"></i
+            >{{
+              session.mode === "server"
+                ? "个人学习空间"
+                : meshStatus
+                  ? meshStatus.caption
+                  : "在自己的节奏里学习"
+            }}</small
           ></span
         >
       </div>

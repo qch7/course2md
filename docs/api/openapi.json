@@ -929,6 +929,386 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HubLink": {
+        "additionalProperties": true,
+        "properties": {
+          "auto_connect": {
+            "default": true,
+            "title": "Auto Connect",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "completed_tasks": {
+            "default": 0,
+            "title": "Completed Tasks",
+            "type": "integer"
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At"
+          },
+          "created_at": {
+            "default": 0.0,
+            "title": "Created At",
+            "type": "number"
+          },
+          "current_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HubLinkTask"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failed_tasks": {
+            "default": 0,
+            "title": "Failed Tasks",
+            "type": "integer"
+          },
+          "has_token": {
+            "default": false,
+            "title": "Has Token",
+            "type": "boolean"
+          },
+          "hub_url": {
+            "default": "",
+            "title": "Hub Url",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "default": "",
+            "title": "Last Error",
+            "type": "string"
+          },
+          "last_heartbeat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat"
+          },
+          "logs": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Logs",
+            "type": "array"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "no_agents": {
+            "default": false,
+            "title": "No Agents",
+            "type": "boolean"
+          },
+          "retry_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry At"
+          },
+          "source": {
+            "default": "manual",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "default": "disconnected",
+            "title": "Status",
+            "type": "string"
+          },
+          "token_hint": {
+            "default": "",
+            "title": "Token Hint",
+            "type": "string"
+          },
+          "without": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Without",
+            "type": "array"
+          },
+          "work_dir": {
+            "default": "",
+            "title": "Work Dir",
+            "type": "string"
+          },
+          "worker_id": {
+            "default": "",
+            "title": "Worker Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "HubLink",
+        "type": "object"
+      },
+      "HubLinkCreateRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "auto_connect": {
+            "default": true,
+            "description": "启动服务时是否自动连接",
+            "title": "Auto Connect",
+            "type": "boolean"
+          },
+          "connect_now": {
+            "default": true,
+            "description": "保存后立即开始连接",
+            "title": "Connect Now",
+            "type": "boolean"
+          },
+          "hub_url": {
+            "default": "",
+            "description": "外部 Hub 地址，例如 https://course.example.com",
+            "title": "Hub Url",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "上报给该 Hub 的节点名称，留空使用本机主机名",
+            "title": "Name",
+            "type": "string"
+          },
+          "no_agents": {
+            "default": false,
+            "description": "不向该 Hub 承担 DSH / Codex 整理任务",
+            "title": "No Agents",
+            "type": "boolean"
+          },
+          "token": {
+            "default": "",
+            "description": "在外部 Hub 计算服务页生成的节点令牌",
+            "title": "Token",
+            "type": "string"
+          },
+          "without": {
+            "description": "不向该 Hub 承担的能力，例如 asr",
+            "items": {
+              "type": "string"
+            },
+            "title": "Without",
+            "type": "array"
+          },
+          "work_dir": {
+            "default": "",
+            "description": "该连接的工作目录，留空使用默认工作目录",
+            "title": "Work Dir",
+            "type": "string"
+          }
+        },
+        "title": "HubLinkCreateRequest",
+        "type": "object"
+      },
+      "HubLinkResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "link": {
+            "$ref": "#/components/schemas/HubLink"
+          }
+        },
+        "required": [
+          "link"
+        ],
+        "title": "HubLinkResponse",
+        "type": "object"
+      },
+      "HubLinkTask": {
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "default": "",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "default": 0.0,
+            "title": "Started At",
+            "type": "number"
+          }
+        },
+        "title": "HubLinkTask",
+        "type": "object"
+      },
+      "HubLinkUpdateRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "auto_connect": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "启动服务时是否自动连接",
+            "title": "Auto Connect"
+          },
+          "hub_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "外部 Hub 地址",
+            "title": "Hub Url"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "上报给该 Hub 的节点名称",
+            "title": "Name"
+          },
+          "no_agents": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "不向该 Hub 承担 DSH / Codex 整理任务",
+            "title": "No Agents"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "新的节点令牌，留空则沿用已保存令牌",
+            "title": "Token"
+          },
+          "without": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "不向该 Hub 承担的能力列表",
+            "title": "Without"
+          },
+          "work_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "工作目录",
+            "title": "Work Dir"
+          }
+        },
+        "title": "HubLinkUpdateRequest",
+        "type": "object"
+      },
+      "HubLinksResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "can_manage": {
+            "default": false,
+            "title": "Can Manage",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "default_name": {
+            "default": "",
+            "title": "Default Name",
+            "type": "string"
+          },
+          "default_work_dir": {
+            "default": "",
+            "title": "Default Work Dir",
+            "type": "string"
+          },
+          "links": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HubLink"
+            },
+            "title": "Links",
+            "type": "array"
+          }
+        },
+        "title": "HubLinksResponse",
+        "type": "object"
+      },
       "Job": {
         "additionalProperties": true,
         "properties": {
@@ -2931,6 +3311,242 @@
         "summary": "重新解析已保存课程的课次",
         "tags": [
           "课程"
+        ]
+      }
+    },
+    "/api/v1/hub-links": {
+      "get": {
+        "operationId": "list_hub_links_api_v1_hub_links_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HubLinksResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "本机对外连接的远程 Hub 列表",
+        "tags": [
+          "计算服务"
+        ]
+      },
+      "post": {
+        "operationId": "create_hub_link_api_v1_hub_links_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HubLinkCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HubLinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "添加对外连接的远程 Hub",
+        "tags": [
+          "计算服务"
+        ]
+      }
+    },
+    "/api/v1/hub-links/{link_id}": {
+      "delete": {
+        "operationId": "delete_hub_link_api_v1_hub_links__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "删除对外连接的远程 Hub",
+        "tags": [
+          "计算服务"
+        ]
+      },
+      "patch": {
+        "operationId": "update_hub_link_api_v1_hub_links__link_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HubLinkUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HubLinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "修改对外连接的远程 Hub 配置",
+        "tags": [
+          "计算服务"
+        ]
+      }
+    },
+    "/api/v1/hub-links/{link_id}/connect": {
+      "post": {
+        "operationId": "connect_hub_link_api_v1_hub_links__link_id__connect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HubLinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "连接指定的远程 Hub",
+        "tags": [
+          "计算服务"
+        ]
+      }
+    },
+    "/api/v1/hub-links/{link_id}/disconnect": {
+      "post": {
+        "operationId": "disconnect_hub_link_api_v1_hub_links__link_id__disconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HubLinkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "断开指定的远程 Hub",
+        "tags": [
+          "计算服务"
         ]
       }
     },

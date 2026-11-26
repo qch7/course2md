@@ -8,6 +8,8 @@
 from __future__ import annotations
 
 import os
+import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -27,6 +29,10 @@ class HubError(RuntimeError):
     pass
 
 
+class AuthError(HubError):
+    """节点令牌无效或已停用，应停止重试并提示重新生成令牌。"""
+
+
 class HttpTransport:
     def __init__(self, hub: str, token: str, timeout: float = 30.0, session: requests.Session | None = None) -> None:
         self.base = hub.rstrip("/") + "/"
@@ -43,7 +49,7 @@ class HttpTransport:
         if response.status_code == 409:
             raise LeaseLost(_detail(response))
         if response.status_code == 401:
-            raise HubError("节点令牌无效或已停用，请在 Hub 的计算服务页重新生成")
+            raise AuthError("节点令牌无效或已停用，请在 Hub 的计算服务页重新生成")
         if response.status_code >= 400:
             raise HubError(f"Hub 返回 {response.status_code}：{_detail(response)}")
         return response.json() if response.content else None
@@ -177,6 +183,10 @@ class RemoteWorker(WorkerRunner):
         name: str = "",
         lease_seconds: float = 60.0,
         poll_interval: float = 2.0,
+        resources: dict[str, Any] | None = None,
+        exec_lock: threading.Lock | None = None,
+        on_task_start: Callable[[ClaimedTask], None] | None = None,
+        on_task_end: Callable[[ClaimedTask, str, str], None] | None = None,
     ) -> None:
         super().__init__(
             transport,
@@ -186,6 +196,10 @@ class RemoteWorker(WorkerRunner):
             kind="remote",
             lease_seconds=lease_seconds,
             poll_interval=poll_interval,
+            resources=resources,
+            exec_lock=exec_lock,
+            on_task_start=on_task_start,
+            on_task_end=on_task_end,
         )
         self.http = transport
         self.work_dir = work_dir
@@ -253,4 +267,4 @@ class RemoteWorker(WorkerRunner):
         return files
 
 
-__all__ = ["SCHEME", "HttpTransport", "HubError", "RemoteWorker"]
+__all__ = ["SCHEME", "AuthError", "HttpTransport", "HubError", "RemoteWorker"]

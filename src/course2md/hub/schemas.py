@@ -83,3 +83,24 @@ class PluginInstallRequest(_Body):
         ..., min_length=1, max_length=4096, description="GitHub 仓库 HTTPS 链接或本机插件项目/安装包路径"
     )
     kind: str = Field("github", description="安装来源：github 或 local")
+
+
+class HubLinkCreateRequest(_Body):
+    hub_url: str = Field("", description="外部 Hub 地址，例如 https://course.example.com")
+    token: str = Field("", description="在外部 Hub 计算服务页生成的节点令牌")
+    name: str = Field("", description="上报给该 Hub 的节点名称，留空使用本机主机名")
+    work_dir: str = Field("", description="该连接的工作目录，留空使用默认工作目录")
+    auto_connect: bool = Field(True, description="启动服务时是否自动连接")
+    no_agents: bool = Field(False, description="不向该 Hub 承担 DSH / Codex 整理任务")
+    without: list[str] = Field(default_factory=list, description="不向该 Hub 承担的能力，例如 asr")
+    connect_now: bool = Field(True, description="保存后立即开始连接")
+
+
+class HubLinkUpdateRequest(_Body):
+    hub_url: str | None = Field(None, description="外部 Hub 地址")
+    token: str | None = Field(None, description="新的节点令牌，留空则沿用已保存令牌")
+    name: str | None = Field(None, description="上报给该 Hub 的节点名称")
+    work_dir: str | None = Field(None, description="工作目录")
+    auto_connect: bool | None = Field(None, description="启动服务时是否自动连接")
+    no_agents: bool | None = Field(None, description="不向该 Hub 承担 DSH / Codex 整理任务")
+    without: list[str] | None = Field(None, description="不向该 Hub 承担的能力列表")

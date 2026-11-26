@@ -328,3 +328,47 @@ class TokenResponse(_Model):
 
 class UsersResponse(_Model):
     users: list[UserInfo] = []
+
+
+class HubLinkTask(_Model):
+    id: str = ""
+    job_id: str = ""
+    stage: str = ""
+    started_at: float = 0.0
+
+
+class HubLink(_Model):
+    id: str
+    hub_url: str = ""
+    name: str = ""
+    work_dir: str = ""
+    has_token: bool = False
+    token_hint: str = ""
+    auto_connect: bool = True
+    no_agents: bool = False
+    without: list[str] = []
+    source: str = "manual"
+    status: str = "disconnected"
+    worker_id: str = ""
+    capabilities: list[str] = []
+    connected_at: float | None = None
+    last_heartbeat: float | None = None
+    last_error: str = ""
+    retry_at: float | None = None
+    current_task: HubLinkTask | None = None
+    completed_tasks: int = 0
+    failed_tasks: int = 0
+    logs: list[str] = []
+    created_at: float = 0.0
+
+
+class HubLinkResponse(_Model):
+    link: HubLink
+
+
+class HubLinksResponse(_Model):
+    links: list[HubLink] = []
+    can_manage: bool = False
+    capabilities: list[str] = []
+    default_name: str = ""
+    default_work_dir: str = ""

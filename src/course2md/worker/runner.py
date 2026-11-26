@@ -11,6 +11,7 @@ import threading
 import time
 import traceback
 import uuid
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from .. import __version__
@@ -62,6 +63,10 @@ class WorkerRunner:
         lease_seconds: float = 60.0,
         poll_interval: float = 1.0,
         progress_interval: float = 0.25,
+        resources: dict[str, Any] | None = None,
+        exec_lock: threading.Lock | None = None,
+        on_task_start: Callable[[ClaimedTask], None] | None = None,
+        on_task_end: Callable[[ClaimedTask, str, str], None] | None = None,
     ) -> None:
         self.transport = transport
         self.capabilities = set(capabilities)
@@ -71,7 +76,11 @@ class WorkerRunner:
         self.lease_seconds = lease_seconds
         self.poll_interval = poll_interval
         self.progress_interval = progress_interval
-        self.resources: dict[str, Any] = {}  # 阶段间复用的节点资源（如已加载的转写模型）
+        # 允许同机多个节点连接共享已加载的模型资源与执行互斥锁，避免重复占显存
+        self.resources: dict[str, Any] = resources if resources is not None else {}
+        self._exec_lock = exec_lock
+        self._on_task_start = on_task_start
+        self._on_task_end = on_task_end
         self.current: str | None = None
         self._current_cancel: threading.Event | None = None
         self._stop = threading.Event()
@@ -114,6 +123,8 @@ class WorkerRunner:
             self._stop.wait(self.poll_interval)
 
     def run_once(self) -> bool:
+        if self._exec_lock is not None and self._exec_lock.locked():
+            return False
         task = self.transport.claim(self.worker_id, self.capabilities, self.lease_seconds)
         if task is None:
             return False
@@ -129,6 +140,8 @@ class WorkerRunner:
 
     def execute(self, task: ClaimedTask) -> None:
         self.current = task.id
+        if self._on_task_start is not None:
+            self._on_task_start(task)
         cancel = threading.Event()
         self._current_cancel = cancel
         if self._stop.is_set():
@@ -170,21 +183,37 @@ class WorkerRunner:
         beat = threading.Thread(target=heartbeat, daemon=True)
         beat.start()
         warnings: list[str] = []
+        outcome = "completed"
+        error_text = ""
         try:
             payload = self.prepare(task, task.payload)
             options = options_from_dict(payload["options"])
             ctx = StageContext(options=options, progress=report, cancel=cancel, on_output=emit, warnings=warnings)
-            stage = create_stage(task.stage, **self.resources)
-            ctx.check()
-            output = stage.run(ctx, decode(payload["inputs"]))
-            self.resources.update(stage.resources())
+            lock = self._exec_lock
+            acquired = False
+            try:
+                if lock is not None:
+                    while not acquired:
+                        ctx.check()
+                        acquired = lock.acquire(timeout=0.2)
+                stage = create_stage(task.stage, **self.resources)
+                ctx.check()
+                output = stage.run(ctx, decode(payload["inputs"]))
+                self.resources.update(stage.resources())
+            finally:
+                if acquired and lock is not None:
+                    lock.release()
             output = self.finish(task, output)
             ctx.check()
             if not lost.is_set():
                 self.transport.complete(
                     task.id, self.worker_id, encode(output), warnings, model=output_model(task.stage, options)
                 )
+            else:
+                outcome = "released"
         except Cancelled as exc:
+            outcome = "released" if self._stop.is_set() else "cancelled"
+            error_text = str(exc)
             if not lost.is_set():
                 if self._stop.is_set():
                     self.transport.release(task.id, self.worker_id)
@@ -193,8 +222,11 @@ class WorkerRunner:
                         task.id, self.worker_id, str(exc), "Cancelled", cancelled=True, warnings=warnings
                     )
         except LeaseLost:
+            outcome = "released"
             done.set()
         except Exception as exc:  # noqa: BLE001  失败原因交给 Hub 展示
+            outcome = "released" if self._stop.is_set() else "failed"
+            error_text = str(exc) or type(exc).__name__
             traceback.print_exc()
             if not lost.is_set():
                 try:
@@ -204,7 +236,7 @@ class WorkerRunner:
                         self.transport.fail(
                             task.id,
                             self.worker_id,
-                            str(exc) or type(exc).__name__,
+                            error_text,
                             type(exc).__name__,
                             warnings=warnings,
                         )
@@ -215,3 +247,5 @@ class WorkerRunner:
             beat.join(timeout=5)
             self.current = None
             self._current_cancel = None
+            if self._on_task_end is not None:
+                self._on_task_end(task, outcome, error_text)

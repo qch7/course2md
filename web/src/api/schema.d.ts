@@ -209,6 +209,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/hub-links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本机对外连接的远程 Hub 列表 */
+    get: operations["list_hub_links_api_v1_hub_links_get"];
+    put?: never;
+    /** 添加对外连接的远程 Hub */
+    post: operations["create_hub_link_api_v1_hub_links_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/hub-links/{link_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 删除对外连接的远程 Hub */
+    delete: operations["delete_hub_link_api_v1_hub_links__link_id__delete"];
+    options?: never;
+    head?: never;
+    /** 修改对外连接的远程 Hub 配置 */
+    patch: operations["update_hub_link_api_v1_hub_links__link_id__patch"];
+    trace?: never;
+  };
+  "/api/v1/hub-links/{link_id}/connect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 连接指定的远程 Hub */
+    post: operations["connect_hub_link_api_v1_hub_links__link_id__connect_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/hub-links/{link_id}/disconnect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 断开指定的远程 Hub */
+    post: operations["disconnect_hub_link_api_v1_hub_links__link_id__disconnect_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/jobs": {
     parameters: {
       query?: never;
@@ -1378,6 +1448,258 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /** HubLink */
+    HubLink: {
+      /**
+       * Auto Connect
+       * @default true
+       */
+      auto_connect: boolean;
+      /**
+       * Capabilities
+       * @default []
+       */
+      capabilities: string[];
+      /**
+       * Completed Tasks
+       * @default 0
+       */
+      completed_tasks: number;
+      /** Connected At */
+      connected_at?: number | null;
+      /**
+       * Created At
+       * @default 0
+       */
+      created_at: number;
+      current_task?: components["schemas"]["HubLinkTask"] | null;
+      /**
+       * Failed Tasks
+       * @default 0
+       */
+      failed_tasks: number;
+      /**
+       * Has Token
+       * @default false
+       */
+      has_token: boolean;
+      /**
+       * Hub Url
+       * @default
+       */
+      hub_url: string;
+      /** Id */
+      id: string;
+      /**
+       * Last Error
+       * @default
+       */
+      last_error: string;
+      /** Last Heartbeat */
+      last_heartbeat?: number | null;
+      /**
+       * Logs
+       * @default []
+       */
+      logs: string[];
+      /**
+       * Name
+       * @default
+       */
+      name: string;
+      /**
+       * No Agents
+       * @default false
+       */
+      no_agents: boolean;
+      /** Retry At */
+      retry_at?: number | null;
+      /**
+       * Source
+       * @default manual
+       */
+      source: string;
+      /**
+       * Status
+       * @default disconnected
+       */
+      status: string;
+      /**
+       * Token Hint
+       * @default
+       */
+      token_hint: string;
+      /**
+       * Without
+       * @default []
+       */
+      without: string[];
+      /**
+       * Work Dir
+       * @default
+       */
+      work_dir: string;
+      /**
+       * Worker Id
+       * @default
+       */
+      worker_id: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HubLinkCreateRequest */
+    HubLinkCreateRequest: {
+      /**
+       * Auto Connect
+       * @description 启动服务时是否自动连接
+       * @default true
+       */
+      auto_connect: boolean;
+      /**
+       * Connect Now
+       * @description 保存后立即开始连接
+       * @default true
+       */
+      connect_now: boolean;
+      /**
+       * Hub Url
+       * @description 外部 Hub 地址，例如 https://course.example.com
+       * @default
+       */
+      hub_url: string;
+      /**
+       * Name
+       * @description 上报给该 Hub 的节点名称，留空使用本机主机名
+       * @default
+       */
+      name: string;
+      /**
+       * No Agents
+       * @description 不向该 Hub 承担 DSH / Codex 整理任务
+       * @default false
+       */
+      no_agents: boolean;
+      /**
+       * Token
+       * @description 在外部 Hub 计算服务页生成的节点令牌
+       * @default
+       */
+      token: string;
+      /**
+       * Without
+       * @description 不向该 Hub 承担的能力，例如 asr
+       */
+      without?: string[];
+      /**
+       * Work Dir
+       * @description 该连接的工作目录，留空使用默认工作目录
+       * @default
+       */
+      work_dir: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HubLinkResponse */
+    HubLinkResponse: {
+      link: components["schemas"]["HubLink"];
+    } & {
+      [key: string]: unknown;
+    };
+    /** HubLinkTask */
+    HubLinkTask: {
+      /**
+       * Id
+       * @default
+       */
+      id: string;
+      /**
+       * Job Id
+       * @default
+       */
+      job_id: string;
+      /**
+       * Stage
+       * @default
+       */
+      stage: string;
+      /**
+       * Started At
+       * @default 0
+       */
+      started_at: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HubLinkUpdateRequest */
+    HubLinkUpdateRequest: {
+      /**
+       * Auto Connect
+       * @description 启动服务时是否自动连接
+       */
+      auto_connect?: boolean | null;
+      /**
+       * Hub Url
+       * @description 外部 Hub 地址
+       */
+      hub_url?: string | null;
+      /**
+       * Name
+       * @description 上报给该 Hub 的节点名称
+       */
+      name?: string | null;
+      /**
+       * No Agents
+       * @description 不向该 Hub 承担 DSH / Codex 整理任务
+       */
+      no_agents?: boolean | null;
+      /**
+       * Token
+       * @description 新的节点令牌，留空则沿用已保存令牌
+       */
+      token?: string | null;
+      /**
+       * Without
+       * @description 不向该 Hub 承担的能力列表
+       */
+      without?: string[] | null;
+      /**
+       * Work Dir
+       * @description 工作目录
+       */
+      work_dir?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HubLinksResponse */
+    HubLinksResponse: {
+      /**
+       * Can Manage
+       * @default false
+       */
+      can_manage: boolean;
+      /**
+       * Capabilities
+       * @default []
+       */
+      capabilities: string[];
+      /**
+       * Default Name
+       * @default
+       */
+      default_name: string;
+      /**
+       * Default Work Dir
+       * @default
+       */
+      default_work_dir: string;
+      /**
+       * Links
+       * @default []
+       */
+      links: components["schemas"]["HubLink"][];
+    } & {
+      [key: string]: unknown;
     };
     /** Job */
     Job: {
@@ -2746,6 +3068,187 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ResolvedCourse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_hub_links_api_v1_hub_links_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HubLinksResponse"];
+        };
+      };
+    };
+  };
+  create_hub_link_api_v1_hub_links_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HubLinkCreateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HubLinkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_hub_link_api_v1_hub_links__link_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        link_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_hub_link_api_v1_hub_links__link_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        link_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HubLinkUpdateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HubLinkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  connect_hub_link_api_v1_hub_links__link_id__connect_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        link_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HubLinkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  disconnect_hub_link_api_v1_hub_links__link_id__disconnect_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        link_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HubLinkResponse"];
         };
       };
       /** @description Validation Error */
