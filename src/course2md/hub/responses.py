@@ -173,6 +173,7 @@ class Config(_Model):
     agent_default: str = ""
     agent_models: dict[str, AgentModelOptions] = {}
     agent_choices: dict[str, dict[str, str]] = {}
+    has_local_node: bool = True
     resolvers: list[ResolverInfo] = []
     server: bool = False
 

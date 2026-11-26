@@ -63,6 +63,7 @@ const outgoingOnlineCount = computed(
 const capabilityNames: Record<string, string> = {
   asr: "转写",
   frames: "画面",
+  "frames:decode": "画面解码",
   "llm-api": "大模型接口",
   hub: "Hub 本机",
   node: "独立节点",
@@ -590,7 +591,14 @@ async function copy(text: string): Promise<void> {
 
       <section class="panel">
         <h3>{{ canManageLinks ? "连入本机的节点" : "节点" }}</h3>
-        <div class="worker-list">
+        <p v-if="!incomingWorkers.length" class="muted empty-hint">
+          {{
+            session.mode === "server"
+              ? "当前服务器以纯 Hub 模式运行，尚未连接任何计算节点。请在下方生成令牌，并在装有显卡或解析插件的电脑上通过本地网页「计算服务 → 连出到外部 Hub」或 course2md worker 接入。"
+              : "暂无连入的计算节点，可在下方生成令牌以允许其它电脑接入。"
+          }}
+        </p>
+        <div v-else class="worker-list">
           <article v-for="worker in incomingWorkers" :key="worker.id" class="worker-card">
             <div class="worker-head">
               <span class="online" :class="{ on: worker.online }"></span>

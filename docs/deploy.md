@@ -90,7 +90,7 @@
 ```bash
 pip install "course2md[server]"
 export COURSE2MD_SECRET_KEY=... COURSE2MD_DATABASE_URL=postgresql+psycopg://...
-course2md server --host 127.0.0.1 --port 8765   # 放在 Caddy / Nginx 等 HTTPS 反向代理之后
+course2md server --host 127.0.0.1 --port 8765   # 默认纯 Hub；单机自带算力可加 --with-node
 ```
 
 不设置 `COURSE2MD_DATABASE_URL` 时使用输出目录中的 SQLite，适合人数较少的场景。

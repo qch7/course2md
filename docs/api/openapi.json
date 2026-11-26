@@ -248,6 +248,11 @@
             "title": "Has Llm Key",
             "type": "boolean"
           },
+          "has_local_node": {
+            "default": true,
+            "title": "Has Local Node",
+            "type": "boolean"
+          },
           "llm_base": {
             "default": "",
             "title": "Llm Base",

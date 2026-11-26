@@ -277,4 +277,26 @@ describe("mesh hub links", () => {
     expect(wrapper.find(".mesh-strip").exists()).toBe(false);
     expect(wrapper.find(".hub-link-card").exists()).toBe(false);
   });
+
+  it("shows pure-Hub onboarding hint when server has zero connected nodes", async () => {
+    session.mode = "server";
+    session.user = { id: "admin", username: "Admin", role: "admin", disabled: false };
+    vi.spyOn(client, "GET").mockImplementation((path) => {
+      if (path === "/api/v1/hub-links") {
+        return Promise.resolve({
+          data: {
+            can_manage: true,
+            default_name: "SERVER",
+            default_work_dir: "/data/hub-links",
+            local_capabilities: [],
+            links: [],
+          },
+          response: new Response(),
+        }) as never;
+      }
+      return Promise.resolve({ data: { workers: [] }, response: new Response() }) as never;
+    });
+    await render();
+    expect(wrapper.text()).toContain("纯 Hub 模式运行");
+  });
 });

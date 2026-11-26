@@ -1095,6 +1095,11 @@ export interface components {
        */
       has_llm_key: boolean;
       /**
+       * Has Local Node
+       * @default true
+       */
+      has_local_node: boolean;
+      /**
        * Llm Base
        * @default
        */

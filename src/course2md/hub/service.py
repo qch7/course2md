@@ -95,9 +95,24 @@ def output_root(manager: JobManager, user: User, requested: str | None) -> Path:
     return Path(requested or base).expanduser().resolve()
 
 
+def has_local_node(manager: JobManager) -> bool:
+    """是否存在与 Hub 同机且可读取本机文件的在线节点（本地应用或 server --with-node）。"""
+    queue = getattr(manager, "queue", None)
+    if queue is not None:
+        return queue.capable_worker_online(["resolver:local", "hub"])
+    return getattr(manager, "builtin_worker", None) is not None
+
+
 def _check_source(manager: JobManager, user: User, resolver_name: str) -> None:
-    if resolver_name == "local" and server_mode(manager) and not user.is_admin:
+    if resolver_name != "local":
+        return
+    if server_mode(manager) and not user.is_admin:
         raise Forbidden("服务器上不能读取本地文件，请使用课程平台链接，或在自己的电脑上运行本地应用")
+    if server_mode(manager) and not has_local_node(manager):
+        raise ResolverError(
+            "当前服务器以纯 Hub 模式运行（未启用本机节点），不能读取服务器本地文件；"
+            "请使用课程平台链接，或以 course2md server --with-node 启动"
+        )
 
 
 def get_job(manager: JobManager, job_id: str, user: User = LOCAL_USER, include_deleted: bool = False) -> Job:
@@ -302,6 +317,7 @@ def config_payload(manager: JobManager) -> dict:
             for name, choice in ((name, default_agent(name)) for name in preset_names())
         },
         "session_batch": True,
+        "has_local_node": has_local_node(manager),
         "resolvers": [{"name": info.name, "label": info.label, "hint": info.source_hint} for info in available()],
     }
 

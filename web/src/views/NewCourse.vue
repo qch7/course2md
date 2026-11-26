@@ -12,7 +12,7 @@ import AppIcon from "@/components/AppIcon.vue";
 import BrandMark from "@/components/BrandMark.vue";
 import OptionsDialog from "@/components/OptionsDialog.vue";
 import { absorb, absorbCourse, dropJob, isBusy, store, watchJob } from "@/stores/jobs";
-import { options, session } from "@/stores/session";
+import { isAdmin, options, session } from "@/stores/session";
 import { showError, toast, ui } from "@/stores/ui";
 import { agentName } from "@/utils/format";
 import { weekFor } from "@/utils/week";
@@ -35,7 +35,13 @@ let overwriteResolve: ((choice: string) => void) | null = null;
 
 const sessions = computed<Session[]>(() => course.value?.sessions ?? []);
 const title = computed(() => (course.value ? course.value.title : "新建课程"));
-const resolverLabels = computed(() => (session.config?.resolvers ?? []).map((item) => item.label));
+const supportsLocalSource = computed(
+  () => !session.config?.server || Boolean(session.config?.has_local_node && isAdmin()),
+);
+const visibleResolvers = computed(() =>
+  (session.config?.resolvers ?? []).filter((item) => item.name !== "local" || supportsLocalSource.value),
+);
+const resolverLabels = computed(() => visibleResolvers.value.map((item) => item.label));
 const agents = computed(() => Object.keys(session.config?.agents ?? {}));
 
 function sessionBusy(item: Session): boolean {
@@ -273,25 +279,27 @@ onMounted(() => {
         <form v-if="editingSource" class="source-card" :aria-busy="resolving" @submit.prevent="resolve">
           <div class="source-heading">
             <AppIcon name="link" :size="16" /><span>从这里开始</span
-            ><span class="source-format">链接 / 本地视频</span>
+            ><span class="source-format">{{ supportsLocalSource ? "链接 / 本地视频" : "课程链接" }}</span>
           </div>
           <label class="sr-only" for="source">课程回放链接或本地视频路径</label>
           <textarea
             id="source"
             v-model="source"
             rows="3"
-            placeholder="粘贴课程回放链接，或输入本地视频路径…"
+            :placeholder="supportsLocalSource ? '粘贴课程回放链接，或输入本地视频路径…' : '粘贴课程回放链接…'"
             required
             @keydown.ctrl.enter.prevent="!resolving && resolve()"
             @keydown.meta.enter.prevent="!resolving && resolve()"
           ></textarea>
           <div class="source-actions">
-            <span
-              :title="
-                (session.config?.resolvers ?? []).map((item) => `${item.label}：${item.hint}`).join('\n')
-              "
-            >
-              {{ resolverLabels.length ? `支持${resolverLabels.join("、")}` : "支持本地视频" }}
+            <span :title="visibleResolvers.map((item) => `${item.label}：${item.hint}`).join('\n')">
+              {{
+                resolverLabels.length
+                  ? `支持${resolverLabels.join("、")}`
+                  : supportsLocalSource
+                    ? "支持本地视频"
+                    : "请先在服务器配置来源解析插件"
+              }}
             </span>
             <div class="source-submit">
               <kbd class="source-shortcut">Ctrl / ⌘ + Enter</kbd>

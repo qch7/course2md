@@ -112,6 +112,18 @@ def test_server_cli_defaults_to_pure_hub_and_supports_with_node():
     assert parser.parse_args(["server", "--with-node"]).with_node is True
 
 
+def test_pure_server_hub_exposes_has_local_node_and_blocks_local_source_for_admin(hub):  # noqa: F811
+    admin = hub.client()
+    register_first_admin(admin, "teacher")
+    assert admin.get("/api/v1/config").json()["has_local_node"] is False
+
+    res = admin.post("/api/v1/resolve", json={"source": "lecture.mp4"})
+    assert res.status_code == 400 and "纯 Hub" in res.json()["error"]
+
+    hub.manager.queue.register_worker("builtin", "内置节点", ["resolver:local", "hub"])
+    assert admin.get("/api/v1/config").json()["has_local_node"] is True
+
+
 def test_node_resolution_failures_are_reported_as_resolver_errors(hub, node):  # noqa: F811
     admin = hub.client()
     register_first_admin(admin, "teacher")
