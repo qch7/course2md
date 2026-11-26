@@ -369,8 +369,13 @@ def cancel_job(job_id: str, request: Request, user: CurrentUser) -> dict[str, An
     summary="导出单个课次的便携产物包（.c2m.zip）",
     response_class=FileResponse,
 )
-def export_job_bundle(job_id: str, request: Request, user: CurrentUser) -> FileResponse:
-    path, filename = service.export_job_bundle_file(_manager(request), job_id, user)
+def export_job_bundle(
+    job_id: str,
+    request: Request,
+    user: CurrentUser,
+    include_cache: bool = Query(False, description="同时带上各阶段缓存，导入后可从中间阶段重新运行"),
+) -> FileResponse:
+    path, filename = service.export_job_bundle_file(_manager(request), job_id, user, include_cache=include_cache)
     return FileResponse(
         path,
         media_type="application/zip",
@@ -393,9 +398,12 @@ def export_course_bundle(
     request: Request,
     user: CurrentUser,
     job_ids: str = Query("", description="逗号分隔的课次任务编号；留空导出全部已完成课次"),
+    include_cache: bool = Query(False, description="同时带上各阶段缓存，导入后可从中间阶段重新运行"),
 ) -> FileResponse:
     selected = [item.strip() for item in job_ids.split(",") if item.strip()] if job_ids else None
-    path, filename = service.export_course_bundle_file(_manager(request), course_id, selected, user)
+    path, filename = service.export_course_bundle_file(
+        _manager(request), course_id, selected, user, include_cache=include_cache
+    )
     return FileResponse(
         path,
         media_type="application/zip",

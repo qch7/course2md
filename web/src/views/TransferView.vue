@@ -182,7 +182,13 @@ const localGroups = computed<LocalGroup[]>(() => {
 });
 
 // ------------------------------------------------------------------ 推送
-const pushTarget = reactive({ peerId: "", hubUrl: "", token: "", conflict: "skip" as ConflictMode });
+const pushTarget = reactive({
+  peerId: "",
+  hubUrl: "",
+  token: "",
+  conflict: "skip" as ConflictMode,
+  includeCache: false,
+});
 const selectedPushJobs = ref(new Set<string>());
 const pushing = ref(false);
 const lastResult = ref<(TransferResultResponse | BundleImportResponse) | null>(null);
@@ -225,6 +231,7 @@ async function runPush(): Promise<void> {
           token: pushTarget.peerId ? null : pushTarget.token.trim(),
           job_ids: jobIds,
           conflict: pushTarget.conflict,
+          include_cache: pushTarget.includeCache,
         },
       }),
     );
@@ -238,7 +245,13 @@ async function runPush(): Promise<void> {
 }
 
 // ------------------------------------------------------------------ 拉取
-const pullSource = reactive({ peerId: "", hubUrl: "", token: "", conflict: "skip" as ConflictMode });
+const pullSource = reactive({
+  peerId: "",
+  hubUrl: "",
+  token: "",
+  conflict: "skip" as ConflictMode,
+  includeCache: false,
+});
 const loadingRemote = ref(false);
 const pulling = ref(false);
 const remoteCatalog = ref<RemoteCatalogResponse | null>(null);
@@ -296,6 +309,7 @@ async function runPull(): Promise<void> {
           token: pullSource.peerId ? null : pullSource.token.trim(),
           job_ids: jobIds,
           conflict: pullSource.conflict,
+          include_cache: pullSource.includeCache,
         },
       }),
     );
@@ -310,6 +324,7 @@ async function runPull(): Promise<void> {
 }
 
 // ------------------------------------------------------------------ 离线产物包导入
+const exportWithCache = ref(false);
 const bundleFile = ref<File | null>(null);
 const bundleConflict = ref<ConflictMode>("skip");
 const importingBundle = ref(false);
@@ -533,6 +548,13 @@ onMounted(() => {
               </select>
             </label>
           </div>
+          <label class="check-line">
+            <input v-model="pushTarget.includeCache" type="checkbox" />
+            <span>带上各阶段缓存</span>
+          </label>
+          <p class="hint">
+            对端可直接从整理等中间阶段重新运行（例如换 Agent 重新整理），不必重新下载与转写；包会稍大一些。
+          </p>
           <div v-if="!pushTarget.peerId" class="hub-form-grid">
             <label class="field compact">
               <span>目标 Hub 地址</span>
@@ -608,6 +630,11 @@ onMounted(() => {
               </select>
             </label>
           </div>
+          <label class="check-line">
+            <input v-model="pullSource.includeCache" type="checkbox" />
+            <span>带回各阶段缓存</span>
+          </label>
+          <p class="hint">拉取后可在本机直接从整理等中间阶段重新运行，不必重新下载与转写。</p>
           <div v-if="!pullSource.peerId" class="hub-form-grid">
             <label class="field compact">
               <span>来源 Hub 地址</span>
@@ -700,6 +727,10 @@ onMounted(() => {
 
           <div class="bundle-export-box">
             <h4>导出当前 Hub 的课程产物包</h4>
+            <label class="check-line">
+              <input v-model="exportWithCache" type="checkbox" />
+              <span>带上各阶段缓存</span>
+            </label>
             <div v-if="localGroups.length" class="transfer-tree">
               <div v-for="group in localGroups" :key="group.key" class="transfer-course-box">
                 <div class="transfer-course-head">
@@ -707,7 +738,7 @@ onMounted(() => {
                   <a
                     v-if="group.courseId && group.transferable.length"
                     class="quiet-button"
-                    :href="courseBundleUrl(group.courseId)"
+                    :href="courseBundleUrl(group.courseId, undefined, exportWithCache)"
                   >
                     导出整门课程（{{ group.transferable.length }} 节）
                   </a>
@@ -715,7 +746,7 @@ onMounted(() => {
                 <div class="transfer-job-list">
                   <div v-for="job in group.transferable" :key="job.id" class="transfer-job-row">
                     <span class="transfer-job-title">{{ sessionLabel(job) }}</span>
-                    <a class="quiet-button" :href="jobBundleUrl(job.id)">导出单节</a>
+                    <a class="quiet-button" :href="jobBundleUrl(job.id, exportWithCache)">导出单节</a>
                   </div>
                 </div>
               </div>

@@ -22,6 +22,7 @@ from .stages import (
     FramesStage,
     LocalExecutor,
     MediaFile,
+    MediaOutput,
     MediaStage,
     OrganizeInput,
     OrganizeStage,
@@ -35,7 +36,7 @@ from .stages.base import Progress, _noop
 from .stages.options import JobOptions
 from .util.text import ensure_dir
 
-__all__ = ["JobOptions", "JobResult", "run_job"]
+__all__ = ["JobOptions", "JobResult", "run_job", "run_stages"]
 
 
 @dataclass
@@ -57,6 +58,51 @@ class JobResult:
     brief_notes: Path | None = None
     note_workspace: Path | None = None
     deleted_media: list[Path] = field(default_factory=list)
+
+
+def run_stages(ctx: StageContext, executor: Executor, result: JobResult) -> MediaOutput:
+    """按顺序把各阶段交给执行器，并把主音轨、转写统计和笔记路径写进 result。
+
+    阶段之间的输入由这里推导。导入互传产物时，用同一段逻辑为各阶段重算缓存键
+    （见 :mod:`course2md.jobs.stage_cache`），因此改动阶段顺序或输入时不会让两处漂移。
+    """
+    options = ctx.options
+    timed = ctx.progress
+
+    # 媒体：解析、下载、抽音频、转写
+    media = executor.run(MediaStage(), ctx, None)
+    transcripts = media.transcripts
+    primary = select_primary(transcripts)
+    result.primary_media = primary.stem
+    if len(transcripts) > 1:
+        timed("转写", 0.56, f"笔记主音轨：{primary.stem}，各机位转写分别保留", None)
+
+    # 画面：需要原视频，与媒体阶段同一节点
+    frame_sets = []
+    if options.ai and options.frames:
+        frame_sets = executor.run(FramesStage(), ctx, transcripts)
+
+    # 校对
+    if options.ai and options.proofread:
+        transcripts = executor.run(ProofreadStage(), ctx, transcripts)
+        primary = next(item for item in transcripts if item.stem == primary.stem)
+
+    # 输出转写文件
+    for item in transcripts:
+        result.segments += len(item.segments)
+        result.chars += sum(len(seg.text) for seg in item.segments)
+        result.corrected += item.corrected
+    for files in executor.run(OutputStage(), ctx, transcripts):
+        result.transcripts_by_media[files.stem] = files.files
+    result.transcripts = result.transcripts_by_media[primary.stem]
+
+    # 整理笔记
+    if options.ai:
+        notes = executor.run(OrganizeStage(), ctx, OrganizeInput(primary, frame_sets))
+        result.detailed_notes, result.brief_notes = notes.detailed, notes.brief
+        result.notes = result.detailed_notes if options.detail else result.brief_notes
+        result.note_workspace = notes.workspace
+    return media
 
 
 def run_job(
@@ -93,39 +139,7 @@ def run_job(
     )
     ensure_dir(options.out_dir)
 
-    # 媒体：解析、下载、抽音频、转写
-    media = executor.run(MediaStage(), ctx, None)
-    transcripts = media.transcripts
-    primary = select_primary(transcripts)
-    result.primary_media = primary.stem
-    if len(transcripts) > 1:
-        timed("转写", 0.56, f"笔记主音轨：{primary.stem}，各机位转写分别保留", None)
-
-    # 画面：需要原视频，与媒体阶段同一节点
-    frame_sets = []
-    if options.ai and options.frames:
-        frame_sets = executor.run(FramesStage(), ctx, transcripts)
-
-    # 校对
-    if options.ai and options.proofread:
-        transcripts = executor.run(ProofreadStage(), ctx, transcripts)
-        primary = next(item for item in transcripts if item.stem == primary.stem)
-
-    # 输出转写文件
-    for item in transcripts:
-        result.segments += len(item.segments)
-        result.chars += sum(len(seg.text) for seg in item.segments)
-        result.corrected += item.corrected
-    for files in executor.run(OutputStage(), ctx, transcripts):
-        result.transcripts_by_media[files.stem] = files.files
-    result.transcripts = result.transcripts_by_media[primary.stem]
-
-    # 整理笔记
-    if options.ai:
-        notes = executor.run(OrganizeStage(), ctx, OrganizeInput(primary, frame_sets))
-        result.detailed_notes, result.brief_notes = notes.detailed, notes.brief
-        result.notes = result.detailed_notes if options.detail else result.brief_notes
-        result.note_workspace = notes.workspace
+    media = run_stages(ctx, executor, result)
 
     if clock["stage"]:
         timings[clock["stage"]] = timings.get(clock["stage"], 0.0) + time.perf_counter() - clock["t0"]

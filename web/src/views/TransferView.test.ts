@@ -137,10 +137,39 @@ describe("TransferView", () => {
         token: null,
         job_ids: ["job-1"],
         conflict: "skip",
+        include_cache: false,
       },
     });
     expect(ui.toast).toContain("新增 1 节");
     expect(wrapper.find(".transfer-summary").text()).toContain("新增 1 节");
+  });
+
+  it("pushes with stage caches when the option is ticked", async () => {
+    vi.mocked(client.POST).mockResolvedValueOnce({
+      data: {
+        hub_url: "https://lab.example.com",
+        courses: [makeCourse()],
+        imported: [makeJob()],
+        skipped: [],
+      },
+      response: new Response(),
+    } as never);
+
+    await render("/transfer?jobId=job-1");
+    const option = wrapper
+      .findAll("label.check-line")
+      .find((item) => item.text().includes("带上各阶段缓存"))!;
+    await option.find("input").setValue(true);
+    await wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("推送所选（1 节）"))!
+      .trigger("click");
+    await flushPromises();
+
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/transfer/push",
+      expect.objectContaining({ body: expect.objectContaining({ include_cache: true }) }),
+    );
   });
 
   it("fetches remote catalog and pulls selected jobs into local store", async () => {
@@ -204,6 +233,7 @@ describe("TransferView", () => {
         token: null,
         job_ids: ["job-remote"],
         conflict: "skip",
+        include_cache: false,
       },
     });
     expect(store.courses.get("course-remote")?.title).toBe("线性代数");

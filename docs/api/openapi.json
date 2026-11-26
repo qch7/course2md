@@ -2876,6 +2876,12 @@
             "description": "临时指定的来源 Hub 地址",
             "title": "Hub Url"
           },
+          "include_cache": {
+            "default": false,
+            "description": "同时带回对端的各阶段缓存，导入后可从中间阶段重新运行",
+            "title": "Include Cache",
+            "type": "boolean"
+          },
           "job_ids": {
             "anyOf": [
               {
@@ -2963,6 +2969,12 @@
             ],
             "description": "临时指定的目标 Hub 地址",
             "title": "Hub Url"
+          },
+          "include_cache": {
+            "default": false,
+            "description": "同时带上各阶段缓存，对端导入后可从中间阶段重新运行",
+            "title": "Include Cache",
+            "type": "boolean"
           },
           "job_ids": {
             "anyOf": [
@@ -3969,6 +3981,18 @@
               "title": "Job Ids",
               "type": "string"
             }
+          },
+          {
+            "description": "同时带上各阶段缓存，导入后可从中间阶段重新运行",
+            "in": "query",
+            "name": "include_cache",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "同时带上各阶段缓存，导入后可从中间阶段重新运行",
+              "title": "Include Cache",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -4460,6 +4484,18 @@
             "schema": {
               "title": "Job Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "同时带上各阶段缓存，导入后可从中间阶段重新运行",
+            "in": "query",
+            "name": "include_cache",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "同时带上各阶段缓存，导入后可从中间阶段重新运行",
+              "title": "Include Cache",
+              "type": "boolean"
             }
           }
         ],

@@ -149,11 +149,16 @@ class TaskQueue:
         progress_stage: str = "",
         progress_fraction: float = 0.0,
         progress_message: str = "",
+        worker_id: str = "hub",
+        finished_at: float | None = None,
     ) -> str:
-        """记录由 Hub 直接执行的轻量阶段（hub_only）及其产物，供阶段历史与缓存复用。"""
+        """记录由 Hub 直接执行的轻量阶段（hub_only）及其产物，供阶段历史与缓存复用。
+
+        导入互传产物时也用它登记各阶段缓存：worker_id 写 ``imported``，时间沿用对端的执行时间。
+        """
         data = canonical_json(output)
         digest = self.store.put_bytes(data)
-        now = _now()
+        now = _now() if finished_at is None else finished_at
         started = now if started_at is None else started_at
         task_id = uuid.uuid4().hex
         with self.db.session() as session:
@@ -166,7 +171,7 @@ class TaskQueue:
                     status="done",
                     requires=[],
                     affinity=None,
-                    worker_id="hub",
+                    worker_id=worker_id,
                     payload=self.cipher.map_fields(payload, TASK_FIELDS, encrypt=True),
                     cache_key=cache_key,
                     result=digest,
@@ -194,7 +199,7 @@ class TaskQueue:
                     job_id=job_id,
                     task_id=task_id,
                     stage=stage,
-                    worker_id="hub",
+                    worker_id=worker_id,
                     model=model,
                     size=len(data),
                     created_at=now,

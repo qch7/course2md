@@ -522,16 +522,29 @@ class RemoteHubClient:
                 Path(tmp_name).unlink(missing_ok=True)
             raise
 
-    def download_course_bundle(self, course_id: str, target_path: Path, *, job_ids: list[str] | None = None) -> Path:
-        params = {"job_ids": ",".join(job_ids)} if job_ids else None
+    def download_course_bundle(
+        self,
+        course_id: str,
+        target_path: Path,
+        *,
+        job_ids: list[str] | None = None,
+        include_cache: bool = False,
+    ) -> Path:
+        params: dict[str, Any] = {"job_ids": ",".join(job_ids)} if job_ids else {}
+        if include_cache:
+            params["include_cache"] = "true"
         return self._download_stream(
             f"/api/v1/courses/{quote(course_id, safe='')}/bundle",
             target_path,
-            params=params,
+            params=params or None,
         )
 
-    def download_job_bundle(self, job_id: str, target_path: Path) -> Path:
-        return self._download_stream(f"/api/v1/jobs/{quote(job_id, safe='')}/bundle", target_path)
+    def download_job_bundle(self, job_id: str, target_path: Path, *, include_cache: bool = False) -> Path:
+        return self._download_stream(
+            f"/api/v1/jobs/{quote(job_id, safe='')}/bundle",
+            target_path,
+            params={"include_cache": "true"} if include_cache else None,
+        )
 
 
 __all__ = [

@@ -1073,7 +1073,9 @@ def _resolve_remote_target(manager: JobManager, body: dict[str, Any], user: User
     return hub_url, raw_token, peer_name or hub_url
 
 
-def export_job_bundle_file(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> tuple[Path, str]:
+def export_job_bundle_file(
+    manager: JobManager, job_id: str, user: User = LOCAL_USER, *, include_cache: bool = False
+) -> tuple[Path, str]:
     from ..jobs.bundle import export_bundle
 
     job = get_job(manager, job_id, user)
@@ -1085,7 +1087,7 @@ def export_job_bundle_file(manager: JobManager, job_id: str, user: User = LOCAL_
     os.close(fd)
     tmp_path = Path(tmp_name)
     try:
-        export_bundle(manager, [job], tmp_path, course=course)
+        export_bundle(manager, [job], tmp_path, course=course, include_cache=include_cache)
     except BaseException:
         tmp_path.unlink(missing_ok=True)
         raise
@@ -1098,6 +1100,8 @@ def export_course_bundle_file(
     course_id: str,
     job_ids: list[str] | None = None,
     user: User = LOCAL_USER,
+    *,
+    include_cache: bool = False,
 ) -> tuple[Path, str]:
     from ..jobs.bundle import export_bundle
 
@@ -1129,7 +1133,7 @@ def export_course_bundle_file(
     os.close(fd)
     tmp_path = Path(tmp_name)
     try:
-        export_bundle(manager, selected, tmp_path, course=course)
+        export_bundle(manager, selected, tmp_path, course=course, include_cache=include_cache)
     except BaseException:
         tmp_path.unlink(missing_ok=True)
         raise
@@ -1229,6 +1233,7 @@ def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
     conflict = str(body.get("conflict") or "skip")
     if conflict not in CONFLICT_MODES:
         raise ValueError(f"不支持的冲突处理策略：{conflict!r}，可选 {', '.join(CONFLICT_MODES)}")
+    include_cache = bool(body.get("include_cache", False))
 
     raw_job_ids = body.get("job_ids")
     course_id = str(body.get("course_id") or "").strip()
@@ -1278,7 +1283,7 @@ def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
             os.close(fd)
             tmp_path = Path(tmp_name)
             try:
-                export_bundle(manager, jobs, tmp_path, course=course)
+                export_bundle(manager, jobs, tmp_path, course=course, include_cache=include_cache)
                 result = remote.push_bundle(tmp_path, conflict=conflict)
             finally:
                 tmp_path.unlink(missing_ok=True)
@@ -1310,6 +1315,7 @@ def transfer_pull(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
     if conflict not in CONFLICT_MODES:
         raise ValueError(f"不支持的冲突处理策略：{conflict!r}，可选 {', '.join(CONFLICT_MODES)}")
 
+    include_cache = bool(body.get("include_cache", False))
     course_id = str(body.get("course_id") or "").strip()
     raw_job_ids = body.get("job_ids")
     job_ids = (
@@ -1342,7 +1348,7 @@ def transfer_pull(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
             os.close(fd)
             tmp_path = Path(tmp_name)
             try:
-                remote.download_course_bundle(course_id, tmp_path, job_ids=job_ids or None)
+                remote.download_course_bundle(course_id, tmp_path, job_ids=job_ids or None, include_cache=include_cache)
                 _absorb(
                     import_bundle_file(
                         manager,
@@ -1361,7 +1367,7 @@ def transfer_pull(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
                 os.close(fd)
                 tmp_path = Path(tmp_name)
                 try:
-                    remote.download_job_bundle(jid, tmp_path)
+                    remote.download_job_bundle(jid, tmp_path, include_cache=include_cache)
                     _absorb(
                         import_bundle_file(
                             manager,

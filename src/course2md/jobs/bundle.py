@@ -30,6 +30,7 @@ from ..stages.codec import options_from_dict, options_to_dict
 from ..util.job_refs import from_job_refs, resolve_relative, to_job_refs
 from ..util.text import safe_name
 from .manager import ACTIVE_STATUSES, Job, JobManager, _collect_files
+from .stage_cache import collect_stage_cache, restore_stage_cache
 
 BUNDLE_FORMAT = "course2md-bundle"
 BUNDLE_VERSION = 1
@@ -170,8 +171,13 @@ def export_bundle(
     target_path: Path,
     *,
     course: dict[str, Any] | None = None,
+    include_cache: bool = False,
 ) -> dict[str, Any]:
-    """将一个或多个已完成课次任务打包为便携的 .c2m.zip 产物包。"""
+    """将一个或多个已完成课次任务打包为便携的 .c2m.zip 产物包。
+
+    include_cache 为 True 时同时带上各阶段的输出（转写、画面、校对结果等），
+    目标 Hub 导入后可以直接从中间阶段重新运行，不必重新下载与转写。
+    """
     if not jobs:
         raise ValueError("没有可导出或传输的课次产物")
     for job in jobs:
@@ -293,6 +299,26 @@ def export_bundle(
                             }
                         )
                     job_meta["versions"] = version_entries
+
+                if include_cache:
+                    stage_entries: list[dict[str, Any]] = []
+                    for meta, output in collect_stage_cache(manager, job):
+                        payload = (json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+                        total_files += 1
+                        total_bytes += len(payload)
+                        if total_files > MAX_BUNDLE_FILES or total_bytes > MAX_UNCOMPRESSED_BYTES:
+                            raise ValueError("产物包内容超过上限，请取消「带上阶段缓存」后重试")
+                        arcname = f"jobs/{key}/stages/{meta['stage']}.json"
+                        archive.writestr(arcname, payload)
+                        stage_entries.append(
+                            {
+                                **meta,
+                                "file": arcname,
+                                "sha256": hashlib.sha256(payload).hexdigest(),
+                                "size": len(payload),
+                            }
+                        )
+                    job_meta["stage_cache"] = stage_entries
 
                 job_entries.append(job_meta)
 
@@ -538,6 +564,35 @@ def _extract_job_files(
         raise
 
 
+def _read_stage_cache(
+    archive: zipfile.ZipFile,
+    key: str,
+    raw: Any,
+    names: set[str],
+    budget: list[int],
+) -> list[tuple[dict[str, Any], Any]]:
+    """读出并校验包内某课次的阶段缓存。清单与文件不符属于损坏的产物包，整体拒绝；没有缓存时返回空列表。"""
+    if not isinstance(raw, list):
+        return []
+    prefix = f"jobs/{key}/stages/"
+    items: list[tuple[dict[str, Any], Any]] = []
+    for meta in raw:
+        if not isinstance(meta, dict):
+            continue
+        member = str(meta.get("file") or "")
+        if not member.startswith(prefix) or member not in names:
+            raise ValueError(f"产物包缺少清单声明的阶段缓存：{member or meta.get('stage')}")
+        payload = _read_zip_member(archive, member, budget, limit=MAX_MANIFEST_BYTES)
+        expected = str(meta.get("sha256") or "")
+        if expected and hashlib.sha256(payload).hexdigest() != expected:
+            raise ValueError(f"产物包阶段缓存校验失败（内容可能已损坏）：{member}")
+        try:
+            items.append((meta, json.loads(payload.decode("utf-8"))))
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ValueError(f"产物包阶段缓存无法解析：{member}") from exc
+    return items
+
+
 def _sanitize_imported_options(
     raw_options: dict[str, Any] | None,
     target_dir: Path,
@@ -736,6 +791,7 @@ def import_bundle(
                     target_dir = _allocate_copy_dir(manager, target_dir.parent, folder_name, root)
                     existing = None
 
+            stage_items = _read_stage_cache(archive, key, entry.get("stage_cache"), names, budget)
             _extract_job_files(
                 archive,
                 key,
@@ -789,6 +845,10 @@ def import_bundle(
             with manager._lock:
                 manager._save(job, replace_existing=True)
                 manager.jobs[job.id] = job
+
+            if stage_items:
+                _, cache_warnings = restore_stage_cache(manager, job, stage_items, replace=overwrite_this)
+                warnings.extend(f"「{title}」{message}" for message in cache_warnings)
 
             versions = getattr(manager, "versions", None)
             if versions is not None:

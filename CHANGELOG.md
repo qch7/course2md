@@ -9,6 +9,7 @@
 - Hub 间课程产物互传：支持在多个 Hub 之间直接推送、拉取课程与课次产物（笔记、转写、关键帧、版本历史与追问记录），以及离线导出/导入 `.c2m.zip` 产物包；打包自动剥离视频音频缓存与平台凭证，导入校验完整性并支持跳过/覆盖/另存副本三种冲突策略；提供「课程互传」网页端（含加密保存对端 Hub）、`/api/v1/transfer/*` 与 `/api/v1/bundles/*` 接口、`course2md transfer` 命令行子命令，以及服务器形态内网互传开关 `COURSE2MD_ALLOW_PRIVATE_TRANSFER`。
 - 网状计算服务：本地网页服务（`course2md web`）内置对外连接多个外部 Hub 的能力，检测到 `.env` 中配置 `COURSE2MD_HUB_URL` 与 `COURSE2MD_WORKER_TOKEN` 时自动连入，并在「计算服务」页统一管理状态与日志；本机内置节点与所有对外连接共享模型缓存与执行互斥锁。
 - 产物生命周期管理：远程节点在阶段完成并回传后自动清理临时输入与输出文件，仅保留有界的 `media/` 视频缓存（新增 `COURSE2MD_WORKER_CACHE_DAYS`，默认 7 天自动回收）；Hub 定期 GC 回收 `objects/` 中已无引用且超过宽限期的孤立对象。
+- 互传支持「带上阶段缓存」：推送、拉取与导出产物包时可附上转写、画面、校对与输出各阶段的结果（网页勾选、`course2md transfer export/copy --with-cache`、接口 `include_cache`），目标 Hub 导入后按导入后的任务选项重新登记，可直接「从整理阶段重新运行」而不必重新下载与转写。包内的本机视频路径与来源页地址不会带出，引用任务目录以外路径的缓存会被忽略并给出警告。`pipeline.run_stages` 从 `run_job` 中抽出，导入时用同一套阶段编排计算缓存键。
 - `course2md server` 新增 `--with-node` 选项，并在 `/api/v1/config` 中暴露 `has_local_node` 能力标记。
 
 - 计算服务升级为网状结构：本地网页（及服务器管理员）在「计算服务」页可直接管理本机对外连接的多个外部 Hub（`/api/v1/hub-links`），支持一键粘贴 `course2md worker` 命令、查看在线/执行/重连/令牌失效状态与日志，并在侧边栏展示互联状态；检测到 `.env` 配置了 `COURSE2MD_HUB_URL` 与 `COURSE2MD_WORKER_TOKEN` 时启动即自动连入，所有连接与本机内置节点共享执行锁和模型缓存，避免重复占显存。
