@@ -242,8 +242,7 @@ def serve_server(host: str = "0.0.0.0", port: int = DEFAULT_PORT, with_node: boo
         )
     FieldCipher.from_env()  # 缺少 cryptography 时尽早报错
     bootstrap_runtime()
-    manager = JobManager(database_url=env("COURSE2MD_DATABASE_URL"), builtin_worker=with_node)
-    manager.mode = "server"
+    manager = JobManager(database_url=env("COURSE2MD_DATABASE_URL"), builtin_worker=with_node, mode="server")
     manager.hub_links.default_work_dir = (manager.data_dir / "hub-links").resolve()
     manager.start_hub_links(
         local_origins={f"http://{host}:{port}", f"http://127.0.0.1:{port}", f"http://localhost:{port}"}

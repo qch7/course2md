@@ -83,7 +83,7 @@ def delete_plugin(name: str, request: Request, user: CurrentUser) -> dict[str, A
 
 @router.get("/config", tags=["配置"], summary="本机配置、默认值与可选项", response_model=r.Config)
 def get_config(request: Request, user: CurrentUser) -> dict[str, Any]:
-    payload = service.config_payload(_manager(request))
+    payload = service.config_payload(_manager(request), user)
     if service.server_mode(_manager(request)):
         # 服务器路径与模型位置只对管理员显示
         payload["server"] = True

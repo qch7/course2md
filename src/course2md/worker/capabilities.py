@@ -56,9 +56,11 @@ def resolver_capabilities() -> set[str]:
     return caps
 
 
-def detect_capabilities(hub: bool = False, agents: bool = True) -> set[str]:
+def detect_capabilities(hub: bool = False, agents: bool = True, llm_api: bool = True) -> set[str]:
+    """llm_api 为 False 时不声明 llm-api：服务器形态的内置节点用它，
+    让模型接口只由用户自己连入的节点承担，Hub 上的密钥不会悄悄接走校对与整理。"""
     caps = {"frame-selector:general"}
-    if _has_llm_api():
+    if llm_api and _has_llm_api():
         caps.add("llm-api")
     caps.update(f"frame-selector:{name}" for name in plugin_names())
     if _installed("faster_whisper", "av"):

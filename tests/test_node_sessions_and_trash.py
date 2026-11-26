@@ -104,6 +104,51 @@ def test_capabilities_detect_llm_api_accurately_and_drop_node_pseudo_cap(monkeyp
     assert "llm-api" in detect_capabilities(agents=False)
 
 
+def test_detect_capabilities_can_leave_out_llm_api(monkeypatch):
+    from course2md.worker import detect_capabilities
+
+    monkeypatch.setenv("COURSE2MD_API_KEY", "sk-test")
+    assert "llm-api" in detect_capabilities(hub=True, agents=False)
+    assert "llm-api" not in detect_capabilities(hub=True, agents=False, llm_api=False)
+
+
+def test_server_builtin_node_does_not_claim_llm_api(tmp_path, monkeypatch):
+    """服务器形态的内置节点不接模型接口任务；本地应用的内置节点仍然承担。"""
+    monkeypatch.setenv("COURSE2MD_API_KEY", "sk-test")
+    monkeypatch.setattr("course2md.agents.dsh.dsh_prefix", list)
+    monkeypatch.setattr("course2md.agents.codex.codex_prefix", list)
+    capabilities = {}
+    for mode in ("server", "local"):
+        manager = server.JobManager(tmp_path / mode / "workspace.sqlite3", builtin_worker=True, mode=mode)
+        try:
+            capabilities[mode] = set(next(w for w in manager.queue.workers() if w["id"] == "builtin")["capabilities"])
+        finally:
+            manager.close()
+    assert "llm-api" not in capabilities["server"] and "hub" in capabilities["server"]
+    assert "llm-api" in capabilities["local"]
+
+
+def test_config_agents_merge_online_node_capabilities(hub):  # noqa: F811
+    """Hub 自己没有 Agent，网页的整理方式要列出在线节点提供的 Agent，并默认选用。"""
+    admin = hub.client()
+    register_first_admin(admin, "teacher")
+    config = admin.get("/api/v1/config").json()
+    assert config["agents"] == {} and config["agent_default"] == "" and config["has_llm_key"] is False
+
+    hub.manager.queue.register_worker(
+        "laptop", "笔记本", ["agent:dsh", "agent:custom", "llm-api", "hub"], kind="remote"
+    )
+    config = admin.get("/api/v1/config").json()
+    assert config["agents"] == {"dsh": "节点：笔记本"}  # agent:custom 不是可选预设
+    assert config["agent_default"] == "dsh"
+    assert config["has_llm_key"] is True
+
+    # 停用后的节点不再算数
+    assert hub.manager.queue.disable_worker("laptop")
+    config = admin.get("/api/v1/config").json()
+    assert config["agents"] == {} and config["agent_default"] == "" and config["has_llm_key"] is False
+
+
 def test_server_cli_defaults_to_pure_hub_and_supports_with_node():
     from course2md.cli import build_parser
 
