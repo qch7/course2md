@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import { client, fileUrl, unwrap } from "@/api/client";
+import { client, fileUrl, jobBundleUrl, unwrap } from "@/api/client";
 import AppIcon from "@/components/AppIcon.vue";
 import BrandMark from "@/components/BrandMark.vue";
 import JobConsole from "@/components/JobConsole.vue";
@@ -205,6 +205,12 @@ onBeforeUnmount(() => {
       </div>
       <div class="topbar-actions">
         <RouterLink
+          v-if="!busy && (job.files?.length ?? 0) > 0"
+          class="quiet-button"
+          :to="{ name: 'transfer', query: { jobId: job.id } }"
+          >互传</RouterLink
+        >
+        <RouterLink
           v-if="job.course_id && store.courses.has(job.course_id)"
           class="quiet-button"
           :to="{ name: 'course', params: { courseId: job.course_id } }"
@@ -368,6 +374,13 @@ onBeforeUnmount(() => {
               </a>
               <a v-if="currentNote" class="quiet-button" :href="fileUrl(job.id, currentNote)">
                 下载 Markdown
+              </a>
+              <a
+                v-if="!busy && (job.files?.length ?? 0) > 0"
+                class="quiet-button"
+                :href="jobBundleUrl(job.id)"
+              >
+                导出产物包
               </a>
             </div>
           </div>

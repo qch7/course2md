@@ -257,6 +257,14 @@ SETTINGS: tuple[Setting, ...] = (
         "str",
         "信任其 X-Forwarded-* 头的反向代理地址，逗号分隔；容器部署中 Hub 不对外暴露时可设为 *。",
     ),
+    Setting(
+        "COURSE2MD_ALLOW_PRIVATE_TRANSFER",
+        "deploy",
+        "allow_private_transfer",
+        False,
+        "bool",
+        "服务器形态下是否允许普通用户向内网或回环地址的 Hub 互传课程产物（管理员默认允许；云元数据地址始终禁止）。",
+    ),
     # --------------------------------------------------------------- worker
     Setting(
         "COURSE2MD_HUB_URL",

@@ -2803,3 +2803,132 @@ legend {
     grid-template-columns: 1fr;
   }
 }
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.transfer-peers {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.transfer-peer-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--radius-s);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.peer-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.peer-url {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+.peer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.transfer-pane {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+.transfer-tree {
+  display: grid;
+  gap: 10px;
+}
+.transfer-course-box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--paper);
+  overflow: hidden;
+}
+.transfer-course-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.transfer-course-head .quiet-button {
+  margin-left: auto;
+}
+.transfer-job-list {
+  display: grid;
+}
+.transfer-job-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+}
+.transfer-job-row + .transfer-job-row {
+  border-top: 1px solid var(--line);
+}
+.transfer-job-row.disabled {
+  color: var(--muted);
+}
+.transfer-job-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.transfer-job-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.bundle-import-box,
+.bundle-export-box {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-s);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.bundle-import-box h4,
+.bundle-export-box h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.transfer-summary {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-s);
+  background: var(--success-soft);
+  color: var(--ink);
+  font-size: 13px;
+}
+.transfer-summary ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}

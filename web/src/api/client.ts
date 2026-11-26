@@ -18,6 +18,13 @@ export type JobEvent = Schemas["JobEvent"];
 export type CreateJobRequest = Schemas["CreateJobRequest"];
 export type Plugin = Schemas["Plugin"];
 export type PluginsResponse = Schemas["PluginsResponse"];
+export type TransferPeer = Schemas["TransferPeer"];
+export type TransferPeersResponse = Schemas["TransferPeersResponse"];
+export type RemoteCourse = Schemas["RemoteCourse"];
+export type RemoteJob = Schemas["RemoteJob"];
+export type RemoteCatalogResponse = Schemas["RemoteCatalogResponse"];
+export type BundleImportResponse = Schemas["BundleImportResponse"];
+export type TransferResultResponse = Schemas["TransferResultResponse"];
 
 export class ApiError extends Error {
   constructor(
@@ -69,6 +76,34 @@ export async function unwrap<T>(
 export function fileUrl(jobId: string, rel: string, inline = false): string {
   const query = `rel=${encodeURIComponent(rel)}${inline ? "&inline=1" : ""}`;
   return `/api/v1/jobs/${encodeURIComponent(jobId)}/file?${query}`;
+}
+
+export function jobBundleUrl(jobId: string): string {
+  return `/api/v1/jobs/${encodeURIComponent(jobId)}/bundle`;
+}
+
+export function courseBundleUrl(courseId: string, jobIds?: string[]): string {
+  const query = jobIds?.length ? `?job_ids=${encodeURIComponent(jobIds.join(","))}` : "";
+  return `/api/v1/courses/${encodeURIComponent(courseId)}/bundle${query}`;
+}
+
+export async function importBundle(
+  file: File,
+  conflict: "skip" | "overwrite" | "copy" = "skip",
+): Promise<BundleImportResponse> {
+  const response = await fetch(`/api/v1/bundles/import?conflict=${encodeURIComponent(conflict)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: file,
+  });
+  const payload = await response.json();
+  return unwrap<BundleImportResponse>(
+    Promise.resolve({
+      data: response.ok ? payload : undefined,
+      error: response.ok ? undefined : payload,
+      response,
+    }),
+  );
 }
 
 export async function importPlugin(file: File): Promise<PluginsResponse> {

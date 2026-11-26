@@ -12,6 +12,7 @@ export const router = createRouter({
     },
     { path: "/job/:jobId", name: "job", component: () => import("./views/JobView.vue"), props: true },
     { path: "/trash", name: "trash", component: () => import("./views/TrashView.vue") },
+    { path: "/transfer", name: "transfer", component: () => import("./views/TransferView.vue") },
     { path: "/workers", name: "workers", component: () => import("./views/WorkersView.vue") },
     { path: "/plugins", name: "plugins", component: () => import("./views/PluginsView.vue") },
     { path: "/account", name: "account", component: () => import("./views/AccountView.vue") },

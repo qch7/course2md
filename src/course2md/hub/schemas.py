@@ -104,3 +104,40 @@ class HubLinkUpdateRequest(_Body):
     auto_connect: bool | None = Field(None, description="启动服务时是否自动连接")
     no_agents: bool | None = Field(None, description="不向该 Hub 承担 DSH / Codex 整理任务")
     without: list[str] | None = Field(None, description="不向该 Hub 承担的能力列表")
+
+
+class TransferPeerCreateRequest(_Body):
+    hub_url: str = Field("", description="对端 Hub 地址，例如 https://course.example.com")
+    token: str = Field("", description="对端 Hub 的 API 令牌（本地应用可留空）")
+    name: str = Field("", description="便于识别的对端名称，留空使用主机名")
+
+
+class TransferPeerUpdateRequest(_Body):
+    hub_url: str | None = Field(None, description="对端 Hub 地址")
+    token: str | None = Field(None, description="新的 API 令牌，留空保持不变；传空串可清除")
+    name: str | None = Field(None, description="对端名称")
+
+
+class RemoteCatalogRequest(_Body):
+    peer_id: str | None = Field(None, description="已保存的对端 Hub 编号")
+    hub_url: str | None = Field(None, description="临时指定的对端 Hub 地址")
+    token: str | None = Field(None, description="临时指定的对端 API 令牌")
+
+
+class TransferPushRequest(_Body):
+    peer_id: str | None = Field(None, description="已保存的目标 Hub 编号")
+    hub_url: str | None = Field(None, description="临时指定的目标 Hub 地址")
+    token: str | None = Field(None, description="临时指定的目标 API 令牌")
+    course_id: str | None = Field(None, description="要推送的课程编号")
+    job_ids: list[str] | None = Field(None, description="要推送的课次任务编号列表")
+    conflict: str = Field("skip", description="冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）")
+
+
+class TransferPullRequest(_Body):
+    peer_id: str | None = Field(None, description="已保存的来源 Hub 编号")
+    hub_url: str | None = Field(None, description="临时指定的来源 Hub 地址")
+    token: str | None = Field(None, description="临时指定的来源 API 令牌")
+    course_id: str | None = Field(None, description="要拉取的对端课程编号")
+    job_ids: list[str] | None = Field(None, description="要拉取的对端课次任务编号列表")
+    conflict: str = Field("skip", description="冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）")
+    out_dir: str | None = Field(None, description="本地模式可选输出根目录")

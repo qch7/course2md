@@ -140,6 +140,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/bundles/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 导入课程产物包（.c2m.zip，流式上传，最大 512 MB） */
+    post: operations["import_bundle_api_v1_bundles_import_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/config": {
     parameters: {
       query?: never;
@@ -187,6 +204,23 @@ export interface paths {
     post?: never;
     /** 删除课程（移入回收站，30 天后永久删除） */
     delete: operations["delete_course_api_v1_courses__course_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/courses/{course_id}/bundle": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 导出整门课程或指定课次的便携产物包（.c2m.zip） */
+    get: operations["export_course_bundle_api_v1_courses__course_id__bundle_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -310,6 +344,23 @@ export interface paths {
     post?: never;
     /** 删除课次任务（移入回收站） */
     delete: operations["delete_job_api_v1_jobs__job_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/jobs/{job_id}/bundle": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 导出单个课次的便携产物包（.c2m.zip） */
+    get: operations["export_job_bundle_api_v1_jobs__job_id__bundle_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -565,6 +616,93 @@ export interface paths {
     put?: never;
     /** 解析来源，列出课次并保存课程 */
     post: operations["resolve_api_v1_resolve_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/transfer/peers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 已保存的对端 Hub 列表 */
+    get: operations["list_transfer_peers_api_v1_transfer_peers_get"];
+    put?: never;
+    /** 保存一个对端 Hub */
+    post: operations["create_transfer_peer_api_v1_transfer_peers_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/transfer/peers/{peer_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 删除已保存的对端 Hub */
+    delete: operations["delete_transfer_peer_api_v1_transfer_peers__peer_id__delete"];
+    options?: never;
+    head?: never;
+    /** 修改已保存的对端 Hub */
+    patch: operations["update_transfer_peer_api_v1_transfer_peers__peer_id__patch"];
+    trace?: never;
+  };
+  "/api/v1/transfer/pull": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 从对端 Hub 拉取课程或课次产物并导入本 Hub */
+    post: operations["transfer_pull_api_v1_transfer_pull_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/transfer/push": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 将本 Hub 的课程或课次产物推送到对端 Hub */
+    post: operations["transfer_push_api_v1_transfer_push_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/transfer/remote": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 连接对端 Hub 并列出可拉取的课程与课次 */
+    post: operations["remote_catalog_api_v1_transfer_remote_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -945,6 +1083,32 @@ export interface components {
        * @default closed
        */
       registration: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** BundleImportResponse */
+    BundleImportResponse: {
+      course?: components["schemas"]["Course"] | null;
+      /**
+       * Imported
+       * @default []
+       */
+      imported: components["schemas"]["Job"][];
+      /**
+       * Overwritten
+       * @default []
+       */
+      overwritten: components["schemas"]["Job"][];
+      /**
+       * Skipped
+       * @default []
+       */
+      skipped: components["schemas"]["TransferSkipped"][];
+      /**
+       * Warnings
+       * @default []
+       */
+      warnings: string[];
     } & {
       [key: string]: unknown;
     };
@@ -2142,6 +2306,145 @@ export interface components {
        */
       version: string;
     };
+    /** RemoteCatalogRequest */
+    RemoteCatalogRequest: {
+      /**
+       * Hub Url
+       * @description 临时指定的对端 Hub 地址
+       */
+      hub_url?: string | null;
+      /**
+       * Peer Id
+       * @description 已保存的对端 Hub 编号
+       */
+      peer_id?: string | null;
+      /**
+       * Token
+       * @description 临时指定的对端 API 令牌
+       */
+      token?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** RemoteCatalogResponse */
+    RemoteCatalogResponse: {
+      /**
+       * Courses
+       * @default []
+       */
+      courses: components["schemas"]["RemoteCourse"][];
+      /**
+       * Hub Url
+       * @default
+       */
+      hub_url: string;
+      /**
+       * Mode
+       * @default local
+       */
+      mode: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** RemoteCourse */
+    RemoteCourse: {
+      /**
+       * Course
+       * @default
+       */
+      course: string;
+      /**
+       * Id
+       * @default
+       */
+      id: string;
+      /**
+       * Jobs
+       * @default []
+       */
+      jobs: components["schemas"]["RemoteJob"][];
+      /**
+       * Source
+       * @default
+       */
+      source: string;
+      /**
+       * Title
+       * @default
+       */
+      title: string;
+      /**
+       * Updated At
+       * @default 0
+       */
+      updated_at: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** RemoteJob */
+    RemoteJob: {
+      /**
+       * Agent
+       * @default
+       */
+      agent: string;
+      /**
+       * Agent Model
+       * @default
+       */
+      agent_model: string;
+      /**
+       * Course
+       * @default
+       */
+      course: string;
+      /**
+       * Course Id
+       * @default
+       */
+      course_id: string;
+      /**
+       * File Count
+       * @default 0
+       */
+      file_count: number;
+      /** Id */
+      id: string;
+      /**
+       * Session Date
+       * @default
+       */
+      session_date: string;
+      /**
+       * Session Id
+       * @default
+       */
+      session_id: string;
+      /**
+       * Started At
+       * @default 0
+       */
+      started_at: number;
+      /**
+       * Status
+       * @default
+       */
+      status: string;
+      /**
+       * Title
+       * @default
+       */
+      title: string;
+      /**
+       * Transferable
+       * @default false
+       */
+      transferable: boolean;
+      /** Week */
+      week?: number | null;
+    } & {
+      [key: string]: unknown;
+    };
     /** RenewBody */
     RenewBody: {
       /**
@@ -2468,6 +2771,234 @@ export interface components {
     TokenResponse: {
       /** Token */
       token: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPeer */
+    TransferPeer: {
+      /**
+       * Created At
+       * @default 0
+       */
+      created_at: number;
+      /**
+       * Has Token
+       * @default false
+       */
+      has_token: boolean;
+      /**
+       * Hub Url
+       * @default
+       */
+      hub_url: string;
+      /** Id */
+      id: string;
+      /**
+       * Name
+       * @default
+       */
+      name: string;
+      /**
+       * Token Hint
+       * @default
+       */
+      token_hint: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPeerCreateRequest */
+    TransferPeerCreateRequest: {
+      /**
+       * Hub Url
+       * @description 对端 Hub 地址，例如 https://course.example.com
+       * @default
+       */
+      hub_url: string;
+      /**
+       * Name
+       * @description 便于识别的对端名称，留空使用主机名
+       * @default
+       */
+      name: string;
+      /**
+       * Token
+       * @description 对端 Hub 的 API 令牌（本地应用可留空）
+       * @default
+       */
+      token: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPeerResponse */
+    TransferPeerResponse: {
+      peer: components["schemas"]["TransferPeer"];
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPeerUpdateRequest */
+    TransferPeerUpdateRequest: {
+      /**
+       * Hub Url
+       * @description 对端 Hub 地址
+       */
+      hub_url?: string | null;
+      /**
+       * Name
+       * @description 对端名称
+       */
+      name?: string | null;
+      /**
+       * Token
+       * @description 新的 API 令牌，留空保持不变；传空串可清除
+       */
+      token?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPeersResponse */
+    TransferPeersResponse: {
+      /**
+       * Peers
+       * @default []
+       */
+      peers: components["schemas"]["TransferPeer"][];
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPullRequest */
+    TransferPullRequest: {
+      /**
+       * Conflict
+       * @description 冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）
+       * @default skip
+       */
+      conflict: string;
+      /**
+       * Course Id
+       * @description 要拉取的对端课程编号
+       */
+      course_id?: string | null;
+      /**
+       * Hub Url
+       * @description 临时指定的来源 Hub 地址
+       */
+      hub_url?: string | null;
+      /**
+       * Job Ids
+       * @description 要拉取的对端课次任务编号列表
+       */
+      job_ids?: string[] | null;
+      /**
+       * Out Dir
+       * @description 本地模式可选输出根目录
+       */
+      out_dir?: string | null;
+      /**
+       * Peer Id
+       * @description 已保存的来源 Hub 编号
+       */
+      peer_id?: string | null;
+      /**
+       * Token
+       * @description 临时指定的来源 API 令牌
+       */
+      token?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferPushRequest */
+    TransferPushRequest: {
+      /**
+       * Conflict
+       * @description 冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）
+       * @default skip
+       */
+      conflict: string;
+      /**
+       * Course Id
+       * @description 要推送的课程编号
+       */
+      course_id?: string | null;
+      /**
+       * Hub Url
+       * @description 临时指定的目标 Hub 地址
+       */
+      hub_url?: string | null;
+      /**
+       * Job Ids
+       * @description 要推送的课次任务编号列表
+       */
+      job_ids?: string[] | null;
+      /**
+       * Peer Id
+       * @description 已保存的目标 Hub 编号
+       */
+      peer_id?: string | null;
+      /**
+       * Token
+       * @description 临时指定的目标 API 令牌
+       */
+      token?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferResultResponse */
+    TransferResultResponse: {
+      /**
+       * Courses
+       * @default []
+       */
+      courses: components["schemas"]["Course"][];
+      /**
+       * Direction
+       * @default push
+       */
+      direction: string;
+      /**
+       * Hub Url
+       * @default
+       */
+      hub_url: string;
+      /**
+       * Imported
+       * @default []
+       */
+      imported: components["schemas"]["Job"][];
+      /**
+       * Overwritten
+       * @default []
+       */
+      overwritten: components["schemas"]["Job"][];
+      /**
+       * Skipped
+       * @default []
+       */
+      skipped: components["schemas"]["TransferSkipped"][];
+      /**
+       * Warnings
+       * @default []
+       */
+      warnings: string[];
+    } & {
+      [key: string]: unknown;
+    };
+    /** TransferSkipped */
+    TransferSkipped: {
+      /**
+       * Reason
+       * @default
+       */
+      reason: string;
+      /**
+       * Session Id
+       * @default
+       */
+      session_id: string;
+      /**
+       * Title
+       * @default
+       */
+      title: string;
     } & {
       [key: string]: unknown;
     };
@@ -2949,6 +3480,40 @@ export interface operations {
       };
     };
   };
+  import_bundle_api_v1_bundles_import_post: {
+    parameters: {
+      query?: {
+        /** @description 冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本） */
+        conflict?: string;
+        /** @description 本地模式可选输出根目录 */
+        out_dir?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BundleImportResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_config_api_v1_config_get: {
     parameters: {
       query?: never;
@@ -3039,6 +3604,38 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Ok"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_course_bundle_api_v1_courses__course_id__bundle_get: {
+    parameters: {
+      query?: {
+        /** @description 逗号分隔的课次任务编号；留空导出全部已完成课次 */
+        job_ids?: string;
+      };
+      header?: never;
+      path: {
+        course_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -3382,6 +3979,35 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Ok"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_job_bundle_api_v1_jobs__job_id__bundle_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
@@ -3889,6 +4515,224 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ResolvedCourse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_transfer_peers_api_v1_transfer_peers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TransferPeersResponse"];
+        };
+      };
+    };
+  };
+  create_transfer_peer_api_v1_transfer_peers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransferPeerCreateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TransferPeerResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_transfer_peer_api_v1_transfer_peers__peer_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        peer_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_transfer_peer_api_v1_transfer_peers__peer_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        peer_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransferPeerUpdateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TransferPeerResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  transfer_pull_api_v1_transfer_pull_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransferPullRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TransferResultResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  transfer_push_api_v1_transfer_push_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TransferPushRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TransferResultResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remote_catalog_api_v1_transfer_remote_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RemoteCatalogRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RemoteCatalogResponse"];
         };
       };
       /** @description Validation Error */

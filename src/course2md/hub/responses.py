@@ -373,3 +373,75 @@ class HubLinksResponse(_Model):
     capabilities: list[str] = []
     default_name: str = ""
     default_work_dir: str = ""
+
+
+class TransferSkipped(_Model):
+    title: str = ""
+    session_id: str = ""
+    reason: str = ""
+
+
+class BundleImportResponse(_Model):
+    course: Course | None = None
+    imported: list[Job] = []
+    overwritten: list[Job] = []
+    skipped: list[TransferSkipped] = []
+    warnings: list[str] = []
+
+
+class TransferPeer(_Model):
+    id: str
+    name: str = ""
+    hub_url: str = ""
+    has_token: bool = False
+    token_hint: str = ""
+    created_at: float = 0.0
+
+
+class TransferPeerResponse(_Model):
+    peer: TransferPeer
+
+
+class TransferPeersResponse(_Model):
+    peers: list[TransferPeer] = []
+
+
+class RemoteJob(_Model):
+    id: str
+    title: str = ""
+    course: str = ""
+    course_id: str = ""
+    session_id: str = ""
+    session_date: str = ""
+    week: int | None = None
+    status: str = ""
+    agent: str = ""
+    agent_model: str = ""
+    started_at: float = 0.0
+    file_count: int = 0
+    transferable: bool = False
+
+
+class RemoteCourse(_Model):
+    id: str = ""
+    title: str = ""
+    course: str = ""
+    source: str = ""
+    updated_at: float = 0.0
+    jobs: list[RemoteJob] = []
+
+
+class RemoteCatalogResponse(_Model):
+    hub_url: str = ""
+    mode: str = "local"
+    courses: list[RemoteCourse] = []
+
+
+class TransferResultResponse(_Model):
+    direction: str = "push"
+    hub_url: str = ""
+    courses: list[Course] = []
+    imported: list[Job] = []
+    overwritten: list[Job] = []
+    skipped: list[TransferSkipped] = []
+    warnings: list[str] = []

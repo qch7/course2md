@@ -56,6 +56,55 @@
         "title": "AuthStatus",
         "type": "object"
       },
+      "BundleImportResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Course"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "imported": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Imported",
+            "type": "array"
+          },
+          "overwritten": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Overwritten",
+            "type": "array"
+          },
+          "skipped": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TransferSkipped"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "BundleImportResponse",
+        "type": "object"
+      },
       "ChatMessage": {
         "additionalProperties": true,
         "properties": {
@@ -1936,6 +1985,194 @@
         "title": "RegisterBody",
         "type": "object"
       },
+      "RemoteCatalogRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "hub_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "临时指定的对端 Hub 地址",
+            "title": "Hub Url"
+          },
+          "peer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "已保存的对端 Hub 编号",
+            "title": "Peer Id"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "临时指定的对端 API 令牌",
+            "title": "Token"
+          }
+        },
+        "title": "RemoteCatalogRequest",
+        "type": "object"
+      },
+      "RemoteCatalogResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "courses": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RemoteCourse"
+            },
+            "title": "Courses",
+            "type": "array"
+          },
+          "hub_url": {
+            "default": "",
+            "title": "Hub Url",
+            "type": "string"
+          },
+          "mode": {
+            "default": "local",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "title": "RemoteCatalogResponse",
+        "type": "object"
+      },
+      "RemoteCourse": {
+        "additionalProperties": true,
+        "properties": {
+          "course": {
+            "default": "",
+            "title": "Course",
+            "type": "string"
+          },
+          "id": {
+            "default": "",
+            "title": "Id",
+            "type": "string"
+          },
+          "jobs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RemoteJob"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": 0.0,
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "title": "RemoteCourse",
+        "type": "object"
+      },
+      "RemoteJob": {
+        "additionalProperties": true,
+        "properties": {
+          "agent": {
+            "default": "",
+            "title": "Agent",
+            "type": "string"
+          },
+          "agent_model": {
+            "default": "",
+            "title": "Agent Model",
+            "type": "string"
+          },
+          "course": {
+            "default": "",
+            "title": "Course",
+            "type": "string"
+          },
+          "course_id": {
+            "default": "",
+            "title": "Course Id",
+            "type": "string"
+          },
+          "file_count": {
+            "default": 0,
+            "title": "File Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "session_date": {
+            "default": "",
+            "title": "Session Date",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "default": 0.0,
+            "title": "Started At",
+            "type": "number"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "transferable": {
+            "default": false,
+            "title": "Transferable",
+            "type": "boolean"
+          },
+          "week": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "RemoteJob",
+        "type": "object"
+      },
       "RenewBody": {
         "properties": {
           "lease_seconds": {
@@ -2469,6 +2706,384 @@
           "token"
         ],
         "title": "TokenResponse",
+        "type": "object"
+      },
+      "TransferPeer": {
+        "additionalProperties": true,
+        "properties": {
+          "created_at": {
+            "default": 0.0,
+            "title": "Created At",
+            "type": "number"
+          },
+          "has_token": {
+            "default": false,
+            "title": "Has Token",
+            "type": "boolean"
+          },
+          "hub_url": {
+            "default": "",
+            "title": "Hub Url",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "token_hint": {
+            "default": "",
+            "title": "Token Hint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "TransferPeer",
+        "type": "object"
+      },
+      "TransferPeerCreateRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "hub_url": {
+            "default": "",
+            "description": "对端 Hub 地址，例如 https://course.example.com",
+            "title": "Hub Url",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "便于识别的对端名称，留空使用主机名",
+            "title": "Name",
+            "type": "string"
+          },
+          "token": {
+            "default": "",
+            "description": "对端 Hub 的 API 令牌（本地应用可留空）",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "title": "TransferPeerCreateRequest",
+        "type": "object"
+      },
+      "TransferPeerResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "peer": {
+            "$ref": "#/components/schemas/TransferPeer"
+          }
+        },
+        "required": [
+          "peer"
+        ],
+        "title": "TransferPeerResponse",
+        "type": "object"
+      },
+      "TransferPeerUpdateRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "hub_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "对端 Hub 地址",
+            "title": "Hub Url"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "对端名称",
+            "title": "Name"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "新的 API 令牌，留空保持不变；传空串可清除",
+            "title": "Token"
+          }
+        },
+        "title": "TransferPeerUpdateRequest",
+        "type": "object"
+      },
+      "TransferPeersResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "peers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TransferPeer"
+            },
+            "title": "Peers",
+            "type": "array"
+          }
+        },
+        "title": "TransferPeersResponse",
+        "type": "object"
+      },
+      "TransferPullRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "conflict": {
+            "default": "skip",
+            "description": "冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）",
+            "title": "Conflict",
+            "type": "string"
+          },
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "要拉取的对端课程编号",
+            "title": "Course Id"
+          },
+          "hub_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "临时指定的来源 Hub 地址",
+            "title": "Hub Url"
+          },
+          "job_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "要拉取的对端课次任务编号列表",
+            "title": "Job Ids"
+          },
+          "out_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "本地模式可选输出根目录",
+            "title": "Out Dir"
+          },
+          "peer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "已保存的来源 Hub 编号",
+            "title": "Peer Id"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "临时指定的来源 API 令牌",
+            "title": "Token"
+          }
+        },
+        "title": "TransferPullRequest",
+        "type": "object"
+      },
+      "TransferPushRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "conflict": {
+            "default": "skip",
+            "description": "冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）",
+            "title": "Conflict",
+            "type": "string"
+          },
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "要推送的课程编号",
+            "title": "Course Id"
+          },
+          "hub_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "临时指定的目标 Hub 地址",
+            "title": "Hub Url"
+          },
+          "job_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "要推送的课次任务编号列表",
+            "title": "Job Ids"
+          },
+          "peer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "已保存的目标 Hub 编号",
+            "title": "Peer Id"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "临时指定的目标 API 令牌",
+            "title": "Token"
+          }
+        },
+        "title": "TransferPushRequest",
+        "type": "object"
+      },
+      "TransferResultResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "courses": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Course"
+            },
+            "title": "Courses",
+            "type": "array"
+          },
+          "direction": {
+            "default": "push",
+            "title": "Direction",
+            "type": "string"
+          },
+          "hub_url": {
+            "default": "",
+            "title": "Hub Url",
+            "type": "string"
+          },
+          "imported": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Imported",
+            "type": "array"
+          },
+          "overwritten": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "title": "Overwritten",
+            "type": "array"
+          },
+          "skipped": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TransferSkipped"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "title": "TransferResultResponse",
+        "type": "object"
+      },
+      "TransferSkipped": {
+        "additionalProperties": true,
+        "properties": {
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "TransferSkipped",
         "type": "object"
       },
       "TrashItem": {
@@ -3143,6 +3758,69 @@
         ]
       }
     },
+    "/api/v1/bundles/import": {
+      "post": {
+        "operationId": "import_bundle_api_v1_bundles_import_post",
+        "parameters": [
+          {
+            "description": "冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）",
+            "in": "query",
+            "name": "conflict",
+            "required": false,
+            "schema": {
+              "default": "skip",
+              "description": "冲突处理：skip（跳过）、overwrite（覆盖）、copy（另存副本）",
+              "title": "Conflict",
+              "type": "string"
+            }
+          },
+          {
+            "description": "本地模式可选输出根目录",
+            "in": "query",
+            "name": "out_dir",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "本地模式可选输出根目录",
+              "title": "Out Dir"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "导入课程产物包（.c2m.zip，流式上传，最大 512 MB）",
+        "tags": [
+          "互传"
+        ]
+      }
+    },
     "/api/v1/config": {
       "get": {
         "operationId": "get_config_api_v1_config_get",
@@ -3264,6 +3942,53 @@
         "summary": "课程详情与课次状态",
         "tags": [
           "课程"
+        ]
+      }
+    },
+    "/api/v1/courses/{course_id}/bundle": {
+      "get": {
+        "operationId": "export_course_bundle_api_v1_courses__course_id__bundle_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "逗号分隔的课次任务编号；留空导出全部已完成课次",
+            "in": "query",
+            "name": "job_ids",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "逗号分隔的课次任务编号；留空导出全部已完成课次",
+              "title": "Job Ids",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "导出整门课程或指定课次的便携产物包（.c2m.zip）",
+        "tags": [
+          "互传"
         ]
       }
     },
@@ -3721,6 +4446,41 @@
         "summary": "任务状态；since / after 只返回新的日志与运行输出",
         "tags": [
           "任务"
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/bundle": {
+      "get": {
+        "operationId": "export_job_bundle_api_v1_jobs__job_id__bundle_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "导出单个课次的便携产物包（.c2m.zip）",
+        "tags": [
+          "互传"
         ]
       }
     },
@@ -4459,6 +5219,281 @@
         "summary": "解析来源，列出课次并保存课程",
         "tags": [
           "课程"
+        ]
+      }
+    },
+    "/api/v1/transfer/peers": {
+      "get": {
+        "operationId": "list_transfer_peers_api_v1_transfer_peers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferPeersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "已保存的对端 Hub 列表",
+        "tags": [
+          "互传"
+        ]
+      },
+      "post": {
+        "operationId": "create_transfer_peer_api_v1_transfer_peers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferPeerCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferPeerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "保存一个对端 Hub",
+        "tags": [
+          "互传"
+        ]
+      }
+    },
+    "/api/v1/transfer/peers/{peer_id}": {
+      "delete": {
+        "operationId": "delete_transfer_peer_api_v1_transfer_peers__peer_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "peer_id",
+            "required": true,
+            "schema": {
+              "title": "Peer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "删除已保存的对端 Hub",
+        "tags": [
+          "互传"
+        ]
+      },
+      "patch": {
+        "operationId": "update_transfer_peer_api_v1_transfer_peers__peer_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "peer_id",
+            "required": true,
+            "schema": {
+              "title": "Peer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferPeerUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferPeerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "修改已保存的对端 Hub",
+        "tags": [
+          "互传"
+        ]
+      }
+    },
+    "/api/v1/transfer/pull": {
+      "post": {
+        "operationId": "transfer_pull_api_v1_transfer_pull_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferPullRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "从对端 Hub 拉取课程或课次产物并导入本 Hub",
+        "tags": [
+          "互传"
+        ]
+      }
+    },
+    "/api/v1/transfer/push": {
+      "post": {
+        "operationId": "transfer_push_api_v1_transfer_push_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "将本 Hub 的课程或课次产物推送到对端 Hub",
+        "tags": [
+          "互传"
+        ]
+      }
+    },
+    "/api/v1/transfer/remote": {
+      "post": {
+        "operationId": "remote_catalog_api_v1_transfer_remote_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteCatalogRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "连接对端 Hub 并列出可拉取的课程与课次",
+        "tags": [
+          "互传"
         ]
       }
     },

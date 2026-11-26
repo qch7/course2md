@@ -126,6 +126,108 @@ def cmd_sync(args) -> int:
     return int(bool(result["conflicts"]))
 
 
+def _print_transfer_summary(result: dict) -> None:
+    imported = result.get("imported") or []
+    overwritten = result.get("overwritten") or []
+    skipped = result.get("skipped") or []
+    print(f"完成：新增 {len(imported)} 节，覆盖 {len(overwritten)} 节，跳过 {len(skipped)} 节")
+    for item in imported:
+        print(f"  + {item.get('title') or item.get('id')}")
+    for item in overwritten:
+        print(f"  ~ {item.get('title') or item.get('id')}（已覆盖）")
+    for item in skipped:
+        print(f"  - {item.get('title') or ''}（{item.get('reason') or '已跳过'}）")
+
+
+def cmd_transfer(args) -> int:
+    import os
+    import tempfile
+
+    from .hub.transfer import RemoteHubClient, TransferError
+
+    action = args.transfer_action
+    try:
+        if action == "list":
+            with RemoteHubClient(args.hub, args.token or "") as remote:
+                catalog = remote.catalog()
+            print(f"Hub：{catalog['hub_url']}（{catalog['mode']}）")
+            courses = catalog.get("courses") or []
+            if not courses:
+                print("没有可传输的课程产物")
+                return 0
+            for course in courses:
+                cid = course.get("id") or "-"
+                print(f"\n课程 [{cid}] {course.get('title')}")
+                for job in course.get("jobs") or []:
+                    mark = "可传" if job.get("transferable") else "处理中/无文件"
+                    date = job.get("session_date") or ""
+                    print(f"  - [{job['id']}] {job.get('title')}  {date}  ({mark}, {job.get('file_count', 0)} 个文件)")
+            return 0
+
+        if action == "export":
+            if not args.course and not args.job:
+                raise SystemExit("请指定 --course 或 --job")
+            target = Path(args.out).expanduser().resolve()
+            with RemoteHubClient(args.hub, args.token or "") as remote:
+                if args.course:
+                    remote.download_course_bundle(args.course, target, job_ids=args.job or None)
+                else:
+                    remote.download_job_bundle(args.job[0], target)
+            print(f"产物包已导出：{target}（{target.stat().st_size / 1024:.0f} KB）")
+            return 0
+
+        if action == "import":
+            bundle_file = Path(args.bundle).expanduser().resolve()
+            if not bundle_file.is_file():
+                raise SystemExit(f"找不到产物包：{bundle_file}")
+            with RemoteHubClient(args.hub, args.token or "") as remote:
+                result = remote.push_bundle(bundle_file, conflict=args.conflict)
+            _print_transfer_summary(result)
+            return 0
+
+        if action == "copy":
+            if not args.course and not args.job:
+                raise SystemExit("请指定 --course 或 --job")
+            imported: list[dict] = []
+            overwritten: list[dict] = []
+            skipped: list[dict] = []
+            with (
+                RemoteHubClient(args.source_hub, args.source_token or "") as src,
+                RemoteHubClient(args.target_hub, args.target_token or "") as dst,
+            ):
+                if args.course:
+                    fd, tmp_name = tempfile.mkstemp(prefix="c2m-cli-", suffix=".c2m.zip")
+                    os.close(fd)
+                    tmp_path = Path(tmp_name)
+                    try:
+                        src.download_course_bundle(args.course, tmp_path, job_ids=args.job or None)
+                        res = dst.push_bundle(tmp_path, conflict=args.conflict)
+                        imported.extend(res.get("imported") or [])
+                        overwritten.extend(res.get("overwritten") or [])
+                        skipped.extend(res.get("skipped") or [])
+                    finally:
+                        tmp_path.unlink(missing_ok=True)
+                else:
+                    for jid in args.job:
+                        fd, tmp_name = tempfile.mkstemp(prefix="c2m-cli-", suffix=".c2m.zip")
+                        os.close(fd)
+                        tmp_path = Path(tmp_name)
+                        try:
+                            src.download_job_bundle(jid, tmp_path)
+                            res = dst.push_bundle(tmp_path, conflict=args.conflict)
+                            imported.extend(res.get("imported") or [])
+                            overwritten.extend(res.get("overwritten") or [])
+                            skipped.extend(res.get("skipped") or [])
+                        finally:
+                            tmp_path.unlink(missing_ok=True)
+            _print_transfer_summary({"imported": imported, "overwritten": overwritten, "skipped": skipped})
+            return 0
+    except TransferError as exc:
+        print(f"传输失败：{exc}", file=sys.stderr)
+        return 1
+    return 2
+
+
 def cmd_list(args) -> int:
     from .resolvers import get_resolver, parse_date, resolve_term_start, view_options, week_of
     from .resolvers.week import TERM_START_SOURCES
@@ -452,6 +554,39 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--vault", required=True, help="Obsidian 仓库路径")
     sync.add_argument("--folder", default="course2md", help="vault 中的子目录")
     sync.set_defaults(func=cmd_sync)
+
+    transfer = sub.add_parser("transfer", help="在多个 Hub 间互传课程产物，或离线导出/导入产物包")
+    transfer_sub = transfer.add_subparsers(dest="transfer_action", required=True)
+
+    t_list = transfer_sub.add_parser("list", help="列出指定 Hub 上可传输的课程与课次")
+    t_list.add_argument("--hub", default="http://127.0.0.1:8765", help="Hub 地址（默认 %(default)s）")
+    t_list.add_argument("--token", default="", help="API 令牌（服务器形态必填）")
+    t_list.set_defaults(func=cmd_transfer)
+
+    t_export = transfer_sub.add_parser("export", help="从 Hub 导出课程或课次产物包（.c2m.zip）")
+    t_export.add_argument("--hub", default="http://127.0.0.1:8765", help="Hub 地址（默认 %(default)s）")
+    t_export.add_argument("--token", default="", help="API 令牌")
+    t_export.add_argument("--course", default="", help="要导出的课程编号")
+    t_export.add_argument("--job", action="append", default=[], help="要导出的课次任务编号（可重复）")
+    t_export.add_argument("-o", "--out", required=True, help="输出的 .c2m.zip 路径")
+    t_export.set_defaults(func=cmd_transfer)
+
+    t_import = transfer_sub.add_parser("import", help="将产物包（.c2m.zip）导入指定 Hub")
+    t_import.add_argument("bundle", help=".c2m.zip 产物包路径")
+    t_import.add_argument("--hub", default="http://127.0.0.1:8765", help="目标 Hub 地址（默认 %(default)s）")
+    t_import.add_argument("--token", default="", help="目标 Hub API 令牌")
+    t_import.add_argument("--conflict", choices=["skip", "overwrite", "copy"], default="skip", help="冲突处理策略")
+    t_import.set_defaults(func=cmd_transfer)
+
+    t_copy = transfer_sub.add_parser("copy", help="将课程或课次产物从来源 Hub 直接传到目标 Hub")
+    t_copy.add_argument("--from", dest="source_hub", default="http://127.0.0.1:8765", help="来源 Hub 地址")
+    t_copy.add_argument("--from-token", dest="source_token", default="", help="来源 Hub API 令牌")
+    t_copy.add_argument("--to", dest="target_hub", required=True, help="目标 Hub 地址")
+    t_copy.add_argument("--to-token", dest="target_token", default="", help="目标 Hub API 令牌")
+    t_copy.add_argument("--course", default="", help="要传输的课程编号")
+    t_copy.add_argument("--job", action="append", default=[], help="要传输的课次任务编号（可重复）")
+    t_copy.add_argument("--conflict", choices=["skip", "overwrite", "copy"], default="skip", help="冲突处理策略")
+    t_copy.set_defaults(func=cmd_transfer)
     return parser
 
 

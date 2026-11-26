@@ -253,6 +253,9 @@ async function removeGroup(group: Group): Promise<void> {
       </div>
     </nav>
     <nav class="sidebar-nav" aria-label="管理">
+      <RouterLink to="/transfer" @click="ui.sidebarOpen = false"
+        ><AppIcon name="transfer" />课程互传</RouterLink
+      >
       <RouterLink to="/trash" @click="ui.sidebarOpen = false"><AppIcon name="trash" />回收站</RouterLink>
       <RouterLink to="/workers" @click="ui.sidebarOpen = false">
         <AppIcon name="server" />计算服务

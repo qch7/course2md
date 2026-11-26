@@ -18,7 +18,9 @@ from urllib.parse import urlparse
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY_BYTES = 1024 * 1024
 MAX_PLUGIN_BYTES = 32 * 1024 * 1024
+MAX_BUNDLE_BYTES = 512 * 1024 * 1024
 PLUGIN_UPLOAD_PATH = "/api/v1/plugins/import"
+BUNDLE_UPLOAD_PATH = "/api/v1/bundles/import"
 WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 
 Scope = dict[str, Any]
@@ -48,7 +50,12 @@ def allowed_host(host_header: str, bind_host: str, port: int | None) -> bool:
     return name in allowed and requested_port in (None, port)
 
 
-def allowed_write(headers: dict[str, str], method: str = "POST", plugin_upload: bool = False) -> bool:
+def allowed_write(
+    headers: dict[str, str],
+    method: str = "POST",
+    plugin_upload: bool = False,
+    bundle_upload: bool = False,
+) -> bool:
     origin = headers.get("origin")
     if origin is not None:
         address = urlparse(origin)
@@ -59,6 +66,8 @@ def allowed_write(headers: dict[str, str], method: str = "POST", plugin_upload: 
     content_type = headers.get("content-type", "").split(";", 1)[0].strip().lower()
     if plugin_upload:
         return content_type == "application/octet-stream"
+    if bundle_upload:
+        return content_type in ("application/octet-stream", "application/zip")
     return content_type == "application/json"
 
 
@@ -84,14 +93,15 @@ class LocalOriginGuard:
             return
         if scope["method"] in WRITE_METHODS:
             plugin_upload = scope["path"] == PLUGIN_UPLOAD_PATH and scope["method"] == "POST"
-            if not allowed_write(headers, scope["method"], plugin_upload):
+            bundle_upload = scope["path"] == BUNDLE_UPLOAD_PATH and scope["method"] == "POST"
+            if not allowed_write(headers, scope["method"], plugin_upload, bundle_upload):
                 await _reject(send, 403, "已拒绝跨站请求，请在 course2md 页面中操作")
                 return
             length = headers.get("content-length", "0").strip() or "0"
             if not length.isdecimal():
                 await _reject(send, 400, "请求长度无效")
                 return
-            maximum = MAX_PLUGIN_BYTES if plugin_upload else MAX_BODY_BYTES
+            maximum = MAX_BUNDLE_BYTES if bundle_upload else (MAX_PLUGIN_BYTES if plugin_upload else MAX_BODY_BYTES)
             if int(length) > maximum:
                 await _reject(send, 400, "请求内容过大")
                 return

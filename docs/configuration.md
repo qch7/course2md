@@ -110,6 +110,7 @@
 | `COURSE2MD_DATABASE_URL` | `database_url` | `（空）` | 数据库地址，例如 postgresql+psycopg://user:pass@db/course2md；留空使用输出目录中的 SQLite。 |
 | `COURSE2MD_REGISTRATION` | `registration` | `closed` | 是否开放自助注册。closed 时由管理员在「管理」页创建账号；首个管理员凭服务启动日志中的初始化令牌创建，不受此项影响。可选：open, closed。 |
 | `COURSE2MD_TRUSTED_PROXIES` | `trusted_proxies` | `127.0.0.1` | 信任其 X-Forwarded-* 头的反向代理地址，逗号分隔；容器部署中 Hub 不对外暴露时可设为 *。 |
+| `COURSE2MD_ALLOW_PRIVATE_TRANSFER` | `allow_private_transfer` | `0` | 服务器形态下是否允许普通用户向内网或回环地址的 Hub 互传课程产物（管理员默认允许；云元数据地址始终禁止）。 |
 
 ## 计算节点
 

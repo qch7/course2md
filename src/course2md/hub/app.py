@@ -21,6 +21,7 @@ from .api import v1_router, worker_router
 from .auth import router as auth_router
 from .security import LocalOriginGuard
 from .service import Forbidden, NotFound
+from .transfer import TransferError
 
 DEFAULT_PORT = 8765
 WEB_DIST = Path(__file__).resolve().parent.parent / "web_dist"  # 前端构建产物（web/ 中 pnpm build 生成）
@@ -102,6 +103,10 @@ def create_app(
     @app.exception_handler(ResolverError)
     async def _resolver(_request: Request, exc: ResolverError) -> JSONResponse:
         return _error(str(exc), 400)
+
+    @app.exception_handler(TransferError)
+    async def _transfer(_request: Request, exc: TransferError) -> JSONResponse:
+        return _error(str(exc), exc.status_code)
 
     @app.exception_handler(RequestValidationError)
     async def _invalid(_request: Request, exc: RequestValidationError) -> JSONResponse:

@@ -254,6 +254,11 @@ onMounted(() => {
       <h1>{{ course ? title : "课程笔记" }}</h1>
     </div>
     <span v-if="!course" class="topbar-note">一点一滴，学有所获</span>
+    <div v-else class="topbar-actions">
+      <RouterLink class="quiet-button" :to="{ name: 'transfer', query: { courseId: course.id } }">
+        互传 / 导出
+      </RouterLink>
+    </div>
   </header>
   <div class="workspace-content">
     <section class="new-view" :class="{ 'has-course': course }">
