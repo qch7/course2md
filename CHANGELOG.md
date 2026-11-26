@@ -30,6 +30,8 @@
 
 - **纯 Hub 与计算节点彻底分离**：`course2md server` 默认不再启动内置节点；`output` 阶段声明为 `hub_only`，直接由 Hub 本身写出转写文件，无内置节点时也能走完完整流水线；移除 `node` 伪能力。
 - **准确的 `llm-api` 能力探测**：仅在本机已配置 API 密钥或接口指向本机回环地址（如本地 Ollama / vLLM）时才声明 `llm-api`，避免无密钥节点误领校对与整理任务。
+- **服务器网页的「整理方式」合并在线节点能力**：Hub 本身通常没有 Agent，之前只列出「内置模型」，在 Hub 上提交的任务因此没选 Agent，被没有读图能力的内置模型整理，配图靠时间盲选而重复。现在 `/api/v1/config` 的 `agents` 合并该用户可用的在线节点所声明的 `agent:<名称>`，并在未显式配置 `COURSE2MD_AGENT` 时默认选用 `dsh`；`has_llm_key` 在服务器形态下改为看在线节点是否具备 `llm-api`。
+- **服务器形态的内置节点（`server --with-node`）不再声明 `llm-api`**：Hub 上的模型密钥不会接走校对与整理任务，模型接口只由用户连入的节点承担；本地应用的内置节点不受影响。`detect_capabilities` 新增 `llm_api` 参数，`JobManager` 新增 `mode` 构造参数。
 - 阶段缓存复用（`find_reusable`）按 `job_id` 与 `owner_id` 严格隔离，防止跨任务或跨用户复用。
 
 - Docker 镜像在构建时自行构建前端（新增 Node 构建阶段）：不再依赖构建上下文里预先生成的 `web_dist`，CI 的镜像检查与发布镜像都带有最新页面，部署机无需手动同步前端产物。

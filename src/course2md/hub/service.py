@@ -33,6 +33,7 @@ from ..config import (
     default_frames,
     default_out_dir,
     default_term_start,
+    env,
     find_model,
 )
 from ..core.accounts import LOCAL_USER, User
@@ -282,18 +283,64 @@ def job_file(job: Job, rel: str) -> Path:
     return target
 
 
-def config_payload(manager: JobManager) -> dict:
+def _node_capabilities(manager: JobManager, user: User) -> list[tuple[str, set[str]]]:
+    """能为该用户领取任务的在线节点及其能力，供网页列出“整个计算服务”实际能做的事。"""
+    queue = getattr(manager, "queue", None)
+    if queue is None:
+        return []
+    return [
+        (item["name"] or item["id"], set(item["capabilities"]))
+        for item in queue.workers()
+        if item["online"] and item["owner_id"] in (None, user.id)
+    ]
+
+
+def available_agents(manager: JobManager, user: User = LOCAL_USER) -> dict[str, str]:
+    """可选的整理 Agent：值为启动命令或提供它的节点名。
+
+    服务器上的 Hub 本身通常不装 Agent，只看 Hub 自己会漏掉计算节点上的 dsh / codex，
+    因此合并在线节点声明的 ``agent:<名称>`` 能力；本地应用另外保留本机检测结果。
+    """
+    from ..agents import detect_agents, preset_names
+
+    found: dict[str, str] = {} if server_mode(manager) else dict(detect_agents())
+    providers: dict[str, list[str]] = {}
+    for node, capabilities in _node_capabilities(manager, user):
+        for capability in sorted(capabilities):
+            name = capability.removeprefix("agent:")
+            # agent:custom 是 Hub 所在电脑上的自定义命令，不是可选预设
+            if capability.startswith("agent:") and name != "custom":
+                providers.setdefault(name, []).append(node)
+    # 内置预设排在前面，节点上的插件预设随后，顺序稳定便于网页展示
+    order = [name for name in preset_names() if name in providers] + sorted(set(providers) - set(preset_names()))
+    for name in order:
+        found.setdefault(name, "节点：" + "、".join(providers[name]))
+    return found
+
+
+def config_payload(manager: JobManager, user: User = LOCAL_USER) -> dict:
     from ..asr.audio import SAMPLE_RATE  # noqa: F401  确认依赖可用
 
     asr_env, llm_env = AsrConfig.from_env(), LlmConfig.from_env()
-    from ..agents import agent_model_options, detect_agents, preset_names
+    from ..agents import agent_model_options, preset_names
+    from ..agents.registry import AUTO_PRESET
     from ..frame_selectors.registry import available as available_selectors
+
+    agents = available_agents(manager, user)
+    agent_default = default_agent().preset
+    if not agent_default and not env("COURSE2MD_AGENT") and AUTO_PRESET in agents:
+        # 网页默认选内置模型会让没读图能力的节点接走整理；有节点能跑 Agent 时默认选它
+        agent_default = AUTO_PRESET
+    has_llm_key = bool(llm_env.resolved_key())
+    if server_mode(manager):
+        # 服务器自己的密钥不算数：模型接口由具备 llm-api 的节点承担
+        has_llm_key = any("llm-api" in caps for _, caps in _node_capabilities(manager, user))
 
     return {
         "model": asr_env.model,
         "device": asr_env.device,
         "model_path": find_model(asr_env.model),
-        "has_llm_key": bool(llm_env.resolved_key()),
+        "has_llm_key": has_llm_key,
         "llm_base": llm_env.base_url,
         "llm_model": llm_env.model,
         "llm_vision": llm_env.vision,
@@ -311,8 +358,8 @@ def config_payload(manager: JobManager) -> dict:
         "startup_warnings": getattr(manager, "warnings", []),
         "formats": ["srt", "vtt", "txt", "md", "json"],
         "devices": ["cuda", "cpu"],
-        "agents": detect_agents(),
-        "agent_default": default_agent().preset,
+        "agents": agents,
+        "agent_default": agent_default,
         "agent_models": agent_model_options(),
         "agent_choices": {
             name: {"provider": choice.provider, "model": choice.model}

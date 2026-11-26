@@ -34,7 +34,7 @@ course2md worker --hub https://course.example.com --token c2m_xxx --work-dir D:\
 | `frames` | 已安装 PyAV 与 OpenCV，可扫描画面 |
 | `frames:decode` | 已安装 PyAV，可解码视频供筛选器使用 |
 | `frame-selector:<名称>` | 可使用对应的画面筛选策略 |
-| `llm-api` | 本机已配置 API 密钥，或接口指向本机回环地址（如 Ollama / vLLM），可调用 OpenAI 兼容接口 |
+| `llm-api` | 本机已配置 API 密钥，或接口指向本机回环地址（如 Ollama / vLLM），可调用 OpenAI 兼容接口。服务器形态的内置节点（`--with-node`）不声明此能力，由用户连入的节点承担 |
 | `agent:dsh` / `agent:codex` | 本机可启动 DSH / Codex |
 | `resolver:<名称>` | 已安装对应的来源解析插件 |
 | `hub` | 与 Hub 同机运行并共享本地路径（`course2md web` 或 `course2md server --with-node` 启用） |

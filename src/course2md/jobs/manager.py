@@ -278,11 +278,18 @@ def _describe_sessions(sessions, root: Path, configured: str = "") -> dict:
 class JobManager:
     """不同课次并行编排，同一课次的提取与对话保持顺序。"""
 
-    def __init__(self, store_path: Path | None = None, builtin_worker: bool = True, database_url: str = "") -> None:
+    def __init__(
+        self,
+        store_path: Path | None = None,
+        builtin_worker: bool = True,
+        database_url: str = "",
+        mode: str = "local",
+    ) -> None:
         self.jobs: dict[str, Job] = {}
         self.courses: dict[str, dict] = {}
         self.warnings: list[str] = []
-        self.mode = "local"  # 服务器形态下为 server，按用户隔离并限制可用操作
+        # 服务器形态下为 server，按用户隔离并限制可用操作；内置节点的能力也随形态不同，所以要在构造时给定
+        self.mode = mode
         self._queue: queue.Queue = queue.Queue()
         self._lock = threading.RLock()
         self._closing = threading.Event()
@@ -313,7 +320,8 @@ class JobManager:
         if builtin_worker:
             self.builtin_worker = WorkerRunner(
                 self.queue,
-                detect_capabilities(hub=True),
+                # 服务器形态的 Hub 不承担模型接口调用，校对与整理交给自带密钥或 Agent 的计算节点
+                detect_capabilities(hub=True, llm_api=mode != "server"),
                 worker_id="builtin",
                 name="内置节点",
                 kind="builtin",
