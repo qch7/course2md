@@ -109,13 +109,21 @@ class WorkerRunner:
         except Exception:  # noqa: BLE001  离线标记失败时依靠心跳超时
             pass
 
+    def on_maintenance(self) -> None:
+        """低频空闲维护钩子（默认每小时触发一次），子类可覆盖以清理本地过期缓存。"""
+
     def run_forever(self) -> None:
         last_touch = 0.0
+        last_maintenance = 0.0
         while not self._stop.is_set():
             try:
-                if time.monotonic() - last_touch > 20:
+                now = time.monotonic()
+                if now - last_touch > 20:
                     self.transport.touch_worker(self.worker_id)
-                    last_touch = time.monotonic()
+                    last_touch = now
+                if now - last_maintenance > 3600:
+                    self.on_maintenance()
+                    last_maintenance = now
                 if self.run_once():
                     continue
             except Exception as exc:  # noqa: BLE001  网络或数据库暂时不可用时稍后重试

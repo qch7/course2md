@@ -93,7 +93,7 @@ class QueueExecutor:
             self._remember_anchor(stage.name, task)
             return decode(self.queue.output(task))
         if stage.name in self.reuse:
-            previous = self.queue.find_reusable(key)
+            previous = self.queue.find_reusable(key, job_id=self.job_id, owner_id=self.owner_id)
             if previous is not None and self._usable(previous):
                 ctx.progress(
                     stage_label(stage.name),

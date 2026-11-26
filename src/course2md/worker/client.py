@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from ..config import default_worker_cache_days
 from ..core.queue import ClaimedTask, LeaseLost
 from ..storage import file_digest
 from ..util.job_refs import SCHEME, from_job_refs, job_refs, resolve_relative, to_job_refs
@@ -204,6 +207,7 @@ class RemoteWorker(WorkerRunner):
         self.http = transport
         self.work_dir = work_dir
         self._before: dict[str, dict[str, str]] = {}
+        self._active_job_id: str | None = None
 
     def register(self) -> None:
         super().register()
@@ -233,6 +237,7 @@ class RemoteWorker(WorkerRunner):
         # 让 complete 携带上传的文件清单：包装 transport.complete
         root = self.job_dir(task)
         original = self.http.complete
+        self._active_job_id = task.job_id
 
         def complete(task_id: str, worker_id: str, output: Any, warnings=None, model: str = "") -> str:
             files = self.upload_outputs(task_id, root)
@@ -244,6 +249,64 @@ class RemoteWorker(WorkerRunner):
         finally:
             self.transport.complete = original  # type: ignore[method-assign]
             self._before.pop(task.id, None)
+            self._cleanup_temp(root)
+            self._active_job_id = None
+
+    @staticmethod
+    def _cleanup_temp(root: Path) -> None:
+        """清理阶段临时工作文件（下载的输入与已回传的输出），仅保留 media/ 等节点本地缓存。"""
+        if not root.is_dir():
+            return
+        for entry in list(root.iterdir()):
+            if entry.name in LOCAL_ONLY_DIRS:
+                if entry.is_dir():
+                    try:
+                        entry.rmdir()  # 为空时顺带移除
+                    except OSError:
+                        pass
+                continue
+            try:
+                if entry.is_dir():
+                    shutil.rmtree(entry, ignore_errors=True)
+                else:
+                    entry.unlink(missing_ok=True)
+            except OSError:
+                pass
+        try:
+            root.rmdir()
+        except OSError:
+            pass
+
+    def prune_cache(self, max_age_seconds: float | None = None, now: float | None = None) -> int:
+        """清理工作目录中的空任务目录以及超过保留期的本地视频缓存目录。"""
+        if not self.work_dir.is_dir():
+            return 0
+        if max_age_seconds is None:
+            days = default_worker_cache_days()
+            max_age_seconds = days * 86400.0 if days > 0 else 0.0
+        current = time.time() if now is None else now
+        removed = 0
+        for entry in list(self.work_dir.iterdir()):
+            if not entry.is_dir() or entry.name == self._active_job_id:
+                continue
+            files = [path for path in entry.rglob("*") if path.is_file()]
+            if not files:
+                shutil.rmtree(entry, ignore_errors=True)
+                removed += 1
+                continue
+            if max_age_seconds <= 0:
+                continue
+            try:
+                newest = max(path.stat().st_mtime for path in files)
+            except OSError:
+                continue
+            if current - newest > max_age_seconds:
+                shutil.rmtree(entry, ignore_errors=True)
+                removed += 1
+        return removed
+
+    def on_maintenance(self) -> None:
+        self.prune_cache()
 
     @staticmethod
     def _files(root: Path) -> dict[str, str]:
@@ -251,7 +314,7 @@ class RemoteWorker(WorkerRunner):
             path.relative_to(root).as_posix(): file_digest(path)
             for path in sorted(root.rglob("*"))
             if path.is_file()
-            and not path.name.endswith(".part")
+            and not path.name.endswith((".part", ".lock"))
             and path.relative_to(root).parts[0] not in LOCAL_ONLY_DIRS
         }
 

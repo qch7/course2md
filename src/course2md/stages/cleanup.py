@@ -16,3 +16,8 @@ class CleanupStage(BaseStage[MediaOutput, None]):
             ctx.check()
             if item.remote and item.path.resolve().is_relative_to(media_dir):
                 item.path.unlink(missing_ok=True)
+        if media_dir.is_dir():
+            try:
+                media_dir.rmdir()
+            except OSError:
+                pass

@@ -420,10 +420,15 @@ class JobManager:
                 break
             parent = parent.parent
 
+    def prune_objects(self, grace_seconds: float = 3600.0, now: float | None = None) -> int:
+        """回收对象存储中已无引用且超过宽限期的孤立对象（如已发布的临时上传块、已清除任务的产物）。"""
+        return self.queue.prune_unreferenced_objects(grace_seconds=grace_seconds, now=now)
+
     def _purge_loop(self) -> None:
         while not self._closing.is_set():
             try:
                 self.purge_deleted()
+                self.prune_objects()
             except Exception as exc:  # noqa: BLE001  清理失败不应影响服务，下个周期重试
                 self.warnings.append(f"清理回收站失败（{exc}）")
             self._closing.wait(PURGE_INTERVAL)

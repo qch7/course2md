@@ -110,20 +110,25 @@ class MediaStage(BaseStage[None, MediaOutput]):
             span = 1.0 / total
             progress("音频", 0.30 + base * 0.04, f"抽取音频：{media.path.name}", None)
             wav_path = options.out_dir / "audio" / f"{safe_name(media.path.stem)}.wav"
-            wav, duration = audio_mod.prepare(media.path, wav_path)
-            if duration < 5:
-                ctx.warn(f"{media.path.name} 音频过短（{duration:.1f}s），跳过")
-                continue
-
-            def on_backend(fraction: float, message: str, base=base, span=span) -> None:
-                progress("转写", 0.34 + base * 0.22 + fraction * span * 0.22, message, fraction)
-
-            backend.progress = on_backend
-            backend.check_cancel = ctx.check
+            wav: Path | None = None
             try:
-                segments = backend.transcribe(audio_mod.read_wav(wav))
+                wav, duration = audio_mod.prepare(media.path, wav_path)
+                if duration < 5:
+                    ctx.warn(f"{media.path.name} 音频过短（{duration:.1f}s），跳过")
+                    continue
+
+                def on_backend(fraction: float, message: str, base=base, span=span) -> None:
+                    progress("转写", 0.34 + base * 0.22 + fraction * span * 0.22, message, fraction)
+
+                backend.progress = on_backend
+                backend.check_cancel = ctx.check
+                try:
+                    segments = backend.transcribe(audio_mod.read_wav(wav))
+                finally:
+                    backend.check_cancel = None
             finally:
-                backend.check_cancel = None
+                if wav is not None and not options.keep_audio:
+                    wav.unlink(missing_ok=True)
             stem = safe_name(media.path.stem)
             output.transcripts.append(
                 Transcript(
@@ -140,8 +145,12 @@ class MediaStage(BaseStage[None, MediaOutput]):
                     },
                 )
             )
-            if not options.keep_audio:
-                wav.unlink(missing_ok=True)
+        audio_dir = options.out_dir / "audio"
+        if not options.keep_audio and audio_dir.is_dir():
+            try:
+                audio_dir.rmdir()
+            except OSError:
+                pass
         return output
 
 

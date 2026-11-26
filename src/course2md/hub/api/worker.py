@@ -202,8 +202,11 @@ def task_file(task_id: str, rel: str, request: Request, worker=Depends(current_w
 
 @router.head("/blobs/{digest}", summary="检查产物文件是否已上传")
 def blob_exists(digest: str, request: Request, worker=Depends(current_worker)) -> Response:
+    store = _queue(request).store
     try:
-        exists = _queue(request).store.exists(digest)
+        exists = store.exists(digest)
+        if exists and hasattr(store, "touch"):
+            store.touch(digest)
     except ValueError:
         exists = False
     return Response(status_code=200 if exists else 404)

@@ -130,6 +130,9 @@ def test_remote_node_transcribes_and_files_return_to_hub(deployment):
     assert not (hub_job / "media").exists()  # 视频留在节点上
     node_job = deployment.node_dir / job["id"]
     assert all(str(path).startswith(str(node_job)) for path in deployment.seen["frames"])
+    # 节点完成并回传后，临时下载/生成的 frames 与 notes 应立即清理，不长期堆积在节点上
+    assert not (node_job / "frames").exists()
+    assert not (node_job / "notes").exists()
 
 
 def test_worker_endpoints_require_valid_token(deployment):

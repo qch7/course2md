@@ -65,11 +65,59 @@ class LocalFileStore(StoreMixin):
     def exists(self, digest: str) -> bool:
         return self.path(digest).is_file()
 
+    def touch(self, digest: str) -> bool:
+        """刷新对象文件的修改时间，避免正在复用或上传中的对象被 GC 误删。"""
+        target = self.path(digest)
+        if not target.is_file():
+            return False
+        try:
+            os.utime(target, None)
+        except OSError:
+            return False
+        return True
+
+    def iter_digests(self) -> list[tuple[str, float]]:
+        """列举存储中全部有效对象的 (摘要, 修改时间)。"""
+        if not self.root.is_dir():
+            return []
+        found: list[tuple[str, float]] = []
+        for bucket in self.root.iterdir():
+            if not bucket.is_dir() or len(bucket.name) != 2:
+                continue
+            for entry in bucket.iterdir():
+                if not entry.is_file() or entry.name.startswith("."):
+                    continue
+                digest = bucket.name + entry.name
+                try:
+                    _check_digest(digest)
+                    mtime = entry.stat().st_mtime
+                except (ValueError, OSError):
+                    continue
+                found.append((digest, mtime))
+        return found
+
+    def delete(self, digest: str) -> bool:
+        """删除对象文件；若前缀目录变空则顺带清理。"""
+        target = self.path(digest)
+        if not target.is_file():
+            return False
+        try:
+            target.unlink()
+        except OSError:
+            return False
+        try:
+            target.parent.rmdir()
+        except OSError:
+            pass
+        return True
+
     def put_bytes(self, data: bytes) -> str:
         digest = digest_bytes(data)
         target = self.path(digest)
         if not target.is_file():
             self._commit(target, lambda handle: handle.write(data))
+        else:
+            self.touch(digest)
         return digest
 
     def put_stream(self, stream: BinaryIO) -> str:
@@ -87,6 +135,7 @@ class LocalFileStore(StoreMixin):
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.is_file():
                 os.unlink(temp)
+                self.touch(digest)
             else:
                 os.replace(temp, target)
             return digest

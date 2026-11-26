@@ -251,3 +251,11 @@ def default_frame_selector() -> str:
 def default_formats() -> tuple[str, ...]:
     raw = env("COURSE2MD_FORMATS", "srt,txt,md")
     return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+def default_worker_cache_days() -> int:
+    """节点本地视频缓存自动清理天数；0 表示不按时间自动清理。"""
+    try:
+        return max(0, int(env("COURSE2MD_WORKER_CACHE_DAYS", "7")))
+    except ValueError:
+        return 7

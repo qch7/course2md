@@ -20,7 +20,7 @@ from sqlalchemy import CursorResult, delete, or_, select, update
 from ..storage import ArtifactStore, canonical_json
 from .crypto import TASK_FIELDS, FieldCipher
 from .db import Database
-from .models import ArtifactRow, TaskEventRow, TaskRow, WorkerRow
+from .models import ArtifactRow, NoteVersionRow, TaskEventRow, TaskRow, WorkerRow
 
 DEFAULT_LEASE = 60.0
 WORKER_ONLINE_SECONDS = 90.0
@@ -212,17 +212,19 @@ class TaskQueue:
             rows = session.scalars(select(TaskRow).where(TaskRow.job_id == job_id).order_by(TaskRow.created_at))
             return [task_dict(row) for row in rows]
 
-    def find_reusable(self, cache_key: str) -> dict[str, Any] | None:
-        """同一缓存键最近一次成功的执行，其输出可直接复用。"""
+    def find_reusable(
+        self, cache_key: str, *, job_id: str | None = None, owner_id: str | None = None
+    ) -> dict[str, Any] | None:
+        """同一缓存键最近一次成功的执行，其输出可直接复用。指定 job_id / owner_id 时只在对应范围内查找。"""
         if not cache_key:
             return None
+        query = select(TaskRow).where(TaskRow.cache_key == cache_key, TaskRow.status == "done")
+        if job_id is not None:
+            query = query.where(TaskRow.job_id == job_id)
+        if owner_id is not None:
+            query = query.where(TaskRow.owner_id == owner_id)
         with self.db.session() as session:
-            row = session.scalars(
-                select(TaskRow)
-                .where(TaskRow.cache_key == cache_key, TaskRow.status == "done")
-                .order_by(TaskRow.finished_at.desc())
-                .limit(1)
-            ).first()
+            row = session.scalars(query.order_by(TaskRow.finished_at.desc()).limit(1)).first()
             if row is None or not row.result or not self.store.exists(row.result):
                 return None
             return task_dict(row)
@@ -372,7 +374,7 @@ class TaskQueue:
 
     # ------------------------------------------------------------ 清理
     def discard_job(self, job_id: str) -> int:
-        """删除某个任务的全部阶段记录、运行输出与产物记录（产物内容按摘要共享，不在此删除）。"""
+        """删除某个任务的全部阶段记录、运行输出与产物记录（产物内容按摘要共享，由对象 GC 统一回收）。"""
         with self.db.session() as session:
             ids = list(session.scalars(select(TaskRow.id).where(TaskRow.job_id == job_id)))
             if ids:
@@ -380,6 +382,37 @@ class TaskQueue:
                 session.execute(delete(ArtifactRow).where(ArtifactRow.task_id.in_(ids)))
                 session.execute(delete(TaskRow).where(TaskRow.id.in_(ids)))
             return len(ids)
+
+    def referenced_digests(self) -> set[str]:
+        """收集当前数据库仍引用的全部对象摘要（阶段结果、产物记录、笔记版本）。"""
+        live: set[str] = set()
+        with self.db.session() as session:
+            for digest in session.scalars(select(TaskRow.result).where(TaskRow.result.is_not(None))):
+                if digest:
+                    live.add(digest)
+            for digest in session.scalars(select(ArtifactRow.digest)):
+                if digest:
+                    live.add(digest)
+            for detailed, brief in session.execute(select(NoteVersionRow.detailed, NoteVersionRow.brief)):
+                if detailed:
+                    live.add(detailed)
+                if brief:
+                    live.add(brief)
+        return live
+
+    def prune_unreferenced_objects(self, *, grace_seconds: float = 3600.0, now: float | None = None) -> int:
+        """回收对象存储中不再被任何任务/产物/版本引用、且超过宽限期的对象文件。"""
+        if not hasattr(self.store, "iter_digests") or not hasattr(self.store, "delete"):
+            return 0
+        cutoff = (_now() if now is None else now) - max(0.0, grace_seconds)
+        live = self.referenced_digests()
+        removed = 0
+        for digest, mtime in self.store.iter_digests():
+            if digest in live or mtime > cutoff:
+                continue
+            if self.store.delete(digest):
+                removed += 1
+        return removed
 
     # ------------------------------------------------------------ 领取与租约
     def claim(

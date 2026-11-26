@@ -121,3 +121,4 @@
 | `COURSE2MD_WORKER_TOKEN` | `token` | `（空）` | 计算节点令牌，由 Hub 的计算服务页或 course2md worker-token 生成。 |
 | `COURSE2MD_WORKER_NAME` | `name` | `（空）` | 节点名称，默认取主机名。 |
 | `COURSE2MD_WORKER_DIR` | `work_dir` | `（空）` | 节点工作目录，下载的视频与中间文件放在这里。 |
+| `COURSE2MD_WORKER_CACHE_DAYS` | `cache_days` | `7` | 节点本地视频缓存（media/）自动清理天数，超过该天数未更新的任务缓存将被删除；设为 0 关闭自动清理。 |

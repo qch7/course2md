@@ -277,6 +277,14 @@ SETTINGS: tuple[Setting, ...] = (
     ),
     Setting("COURSE2MD_WORKER_NAME", "worker", "name", "", "str", "节点名称，默认取主机名。"),
     Setting("COURSE2MD_WORKER_DIR", "worker", "work_dir", "", "path", "节点工作目录，下载的视频与中间文件放在这里。"),
+    Setting(
+        "COURSE2MD_WORKER_CACHE_DAYS",
+        "worker",
+        "cache_days",
+        "7",
+        "int",
+        "节点本地视频缓存（media/）自动清理天数，超过该天数未更新的任务缓存将被删除；设为 0 关闭自动清理。",
+    ),
 )
 
 BY_ENV: dict[str, Setting] = {item.env: item for item in SETTINGS}
