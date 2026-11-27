@@ -17,6 +17,7 @@ from course2md.resolvers.base import MediaRef
 from course2md.stages import Cancelled
 from course2md.stages import media as media_stage
 from course2md.stages.executor import QueueExecutor
+from course2md.stages.options import JobOptions
 from course2md.storage import LocalFileStore
 from course2md.worker import WorkerRunner
 
@@ -55,7 +56,7 @@ def hub(tmp_path, monkeypatch):
         progress_interval=0,
     )
     worker.start()
-    options = pipeline.JobOptions(source="mock", out_dir=tmp_path / "out", proofread=False, frames=False)
+    options = JobOptions(source="mock", out_dir=tmp_path / "out", proofread=False, frames=False)
     yield SimpleNamespace(queue=queue, worker=worker, options=options, calls=calls, tmp_path=tmp_path)
     worker.stop()
     db.dispose()

@@ -25,7 +25,7 @@ In = TypeVar("In")
 Out = TypeVar("Out")
 
 
-def _noop(_stage: str, _fraction: float, _message: str, _sub: float | None = None) -> None:
+def noop_progress(_stage: str, _fraction: float, _message: str, _sub: float | None = None) -> None:
     return None
 
 
@@ -38,7 +38,7 @@ class StageContext:
     """一次任务内各阶段共享的运行环境。"""
 
     options: JobOptions
-    progress: Progress = _noop
+    progress: Progress = noop_progress
     cancel: threading.Event = field(default_factory=threading.Event)
     on_output: AgentOutput | None = None
     warnings: list[str] = field(default_factory=list)

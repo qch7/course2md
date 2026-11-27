@@ -25,7 +25,7 @@ from ..config import (
 )
 from ..core.queue import TaskQueue
 from ..core.versions import NoteVersions
-from ..pipeline import JobOptions, JobResult, run_job
+from ..pipeline import JobResult, run_job
 from ..resolvers import (
     course_identity,
     parse_date,
@@ -35,6 +35,7 @@ from ..resolvers import (
 )
 from ..stages.codec import options_from_dict, options_to_dict
 from ..stages.executor import QueueExecutor, Suspended
+from ..stages.options import JobOptions
 from ..storage import LocalFileStore
 from ..util.text import safe_name
 from .storage import WorkspaceStore

@@ -54,7 +54,8 @@ def _agent_from_args(choice, args):
 
 def cmd_run(args) -> int:
     from .agents import detect_agents
-    from .pipeline import JobOptions, run_job
+    from .pipeline import run_job
+    from .stages.options import JobOptions
 
     agent = _agent_from_args("none" if args.no_agent else args.agent or None, args)
     if args.agent not in ("", "none", "builtin") and not args.no_agent and not agent.resolved_command():

@@ -3,10 +3,11 @@
 import threading
 
 from course2md.jobs.manager import Job, JobManager
-from course2md.pipeline import JobOptions, JobResult
+from course2md.pipeline import JobResult
 from course2md.stages.base import StageContext
 from course2md.stages.codec import cache_key, options_to_dict
 from course2md.stages.executor import QueueExecutor, Suspended
+from course2md.stages.options import JobOptions
 from course2md.stages.output import OutputStage
 from course2md.stages.proofread import ProofreadStage
 

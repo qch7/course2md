@@ -8,6 +8,7 @@ import pytest
 
 from course2md import resolvers
 from course2md.resolvers import registry
+from course2md.stages.options import JobOptions
 
 
 @pytest.fixture
@@ -125,5 +126,5 @@ def test_pipeline_uses_plugin_primary_flag(plugins, tmp_path, monkeypatch):
     monkeypatch.setattr(media_stage, "WhisperBackend", Backend)
     monkeypatch.setattr(media_stage.audio_mod, "prepare", lambda media_path, wav: (wav, 60.0))
     monkeypatch.setattr(media_stage.audio_mod, "read_wav", lambda wav: None)
-    result = pipeline.run_job(pipeline.JobOptions(source="fake", out_dir=tmp_path / "out", ai=False))
+    result = pipeline.run_job(JobOptions(source="fake", out_dir=tmp_path / "out", ai=False))
     assert result.primary_media == "2"

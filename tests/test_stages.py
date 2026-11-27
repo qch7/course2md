@@ -27,6 +27,7 @@ from course2md.stages import (
     select_primary,
 )
 from course2md.stages import media as media_stage
+from course2md.stages.options import JobOptions
 
 
 def _media(**kwargs) -> MediaFile:
@@ -79,11 +80,11 @@ def test_frame_selector_survives_queue_serialization_and_changes_cache_keys(tmp_
     from course2md.stages.artifacts import OrganizeInput
     from course2md.stages.codec import cache_key, options_from_dict, options_to_dict, requires_for
 
-    legacy = options_to_dict(pipeline.JobOptions("local", tmp_path))
+    legacy = options_to_dict(JobOptions("local", tmp_path))
     legacy.pop("frame_selector")
     classroom = options_from_dict(legacy)
     assert classroom.frame_selector == "classroom"
-    options = pipeline.JobOptions("local", tmp_path, frame_selector="last-two")
+    options = JobOptions("local", tmp_path, frame_selector="last-two")
     payload = options_to_dict(options)
     assert options_from_dict(payload).frame_selector == "last-two"
     for stage in ("frames", "organize"):
@@ -165,7 +166,7 @@ def test_run_job_sends_every_stage_through_executor(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(lesson, "build_note_pair", lambda *args, **kwargs: NotePair("# 详\n", "# 略\n"))
     executor = RecordingExecutor()
-    result = pipeline.run_job(pipeline.JobOptions(source="mock", out_dir=tmp_path / "out"), executor=executor)
+    result = pipeline.run_job(JobOptions(source="mock", out_dir=tmp_path / "out"), executor=executor)
     assert [name for name, _ in executor.calls] == ["media", "frames", "proofread", "output", "organize"]
     assert all(isinstance(requires, tuple) for _, requires in executor.calls)
     assert result.detailed_notes.is_file()
@@ -174,14 +175,14 @@ def test_run_job_sends_every_stage_through_executor(tmp_path, monkeypatch):
 def test_run_job_without_ai_only_runs_media_and_output(tmp_path, monkeypatch):
     _fake_media(monkeypatch, tmp_path)
     executor = RecordingExecutor()
-    result = pipeline.run_job(pipeline.JobOptions(source="mock", out_dir=tmp_path / "out", ai=False), executor=executor)
+    result = pipeline.run_job(JobOptions(source="mock", out_dir=tmp_path / "out", ai=False), executor=executor)
     assert [name for name, _ in executor.calls] == ["media", "output"]
     assert result.transcripts["srt"].is_file()
 
 
 def test_media_stage_reuses_matching_backend(tmp_path, monkeypatch):
     _fake_media(monkeypatch, tmp_path)
-    options = pipeline.JobOptions(source="mock", out_dir=tmp_path / "out", ai=False)
+    options = JobOptions(source="mock", out_dir=tmp_path / "out", ai=False)
     shared = SimpleNamespace(cfg=options.asr, transcribe=lambda samples: [Segment(0, 1, "复用。")])
     stage = media_stage.MediaStage(shared)
     output = stage.run(StageContext(options=options))

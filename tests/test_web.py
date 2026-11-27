@@ -230,8 +230,9 @@ def test_output_cursor_survives_buffer_truncation(web):
 
 def test_followup_queue_is_idempotent_and_survives_restart(tmp_path, monkeypatch):
     from course2md.config import LlmConfig
-    from course2md.pipeline import JobOptions, JobResult
+    from course2md.pipeline import JobResult
     from course2md.refine import conversation
+    from course2md.stages.options import JobOptions
 
     root = tmp_path / "output"
     work = root / "notes" / "agent-workspace" / "one"
@@ -288,7 +289,8 @@ def test_web_rejects_unavailable_codex_before_enqueuing(web, monkeypatch):
 
 
 def test_completed_job_exposes_backend_and_organizing_duration(tmp_path, monkeypatch):
-    from course2md.pipeline import JobOptions, JobResult
+    from course2md.pipeline import JobResult
+    from course2md.stages.options import JobOptions
 
     job = server.Job(id="timed", source="fixture", title="lecture", out_dir=tmp_path, agent="codex")
     options = JobOptions(source="fixture", out_dir=tmp_path)
@@ -539,7 +541,8 @@ def test_refresh_failure_keeps_saved_sessions(web, monkeypatch):
 
 def test_all_job_states_and_custom_output_survive_restart(tmp_path, monkeypatch):
     from course2md.config import LlmConfig
-    from course2md.pipeline import JobOptions, JobResult
+    from course2md.pipeline import JobResult
+    from course2md.stages.options import JobOptions
 
     root = tmp_path / "workspace"
     monkeypatch.setenv("COURSE2MD_OUT_DIR", str(root))
@@ -691,8 +694,9 @@ def test_malformed_requests_return_client_errors(web):
 
 def test_failed_followup_keeps_completed_course_usable(tmp_path, monkeypatch):
     from course2md.config import LlmConfig
-    from course2md.pipeline import JobOptions, JobResult
+    from course2md.pipeline import JobResult
     from course2md.refine import conversation
+    from course2md.stages.options import JobOptions
 
     root = tmp_path / "output"
     work = root / "notes" / "agent-workspace" / "one"

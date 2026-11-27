@@ -32,11 +32,11 @@ from .stages import (
     check_formats,
     select_primary,
 )
-from .stages.base import Progress, _noop
+from .stages.base import Progress, noop_progress
 from .stages.options import JobOptions
 from .util.text import ensure_dir
 
-__all__ = ["JobOptions", "JobResult", "run_job", "run_stages"]
+__all__ = ["JobResult", "run_job", "run_stages"]
 
 
 @dataclass
@@ -107,7 +107,7 @@ def run_stages(ctx: StageContext, executor: Executor, result: JobResult) -> Medi
 
 def run_job(
     options: JobOptions,
-    progress: Progress = _noop,
+    progress: Progress = noop_progress,
     cancel: threading.Event | None = None,
     on_output: AgentOutput | None = None,
     executor: Executor | None = None,
