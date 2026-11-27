@@ -158,6 +158,118 @@ describe("mesh topology and local nodes", () => {
     expect(wrapper.findAll(".worker-card").some((card) => card.text().includes("内置节点"))).toBe(false);
   });
 
+  function position(selector: string): { x: number; y: number } {
+    const match = /translate\(([-\d.e]+) ([-\d.e]+)\)/.exec(wrapper.find(selector).attributes("transform")!)!;
+    return { x: Number(match[1]), y: Number(match[2]) };
+  }
+
+  // jsdom 没有 PointerEvent，VTU 会退回 MouseEvent 且无法给它赋 clientX，所以直接派发原生事件；
+  // MouseEvent 的 button 默认为 0（主键），正好满足拖动条件
+  async function pointer(selector: string, type: string, x: number, y: number): Promise<void> {
+    wrapper
+      .find(selector)
+      .element.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
+    await flushPromises();
+  }
+
+  async function dragBy(selector: string, dx: number, dy: number): Promise<void> {
+    await pointer(selector, "pointerdown", 100, 100);
+    await pointer(selector, "pointermove", 100 + dx, 100 + dy);
+    await pointer(selector, "pointerup", 100 + dx, 100 + dy);
+  }
+
+  describe("spring physics", () => {
+    let queue: FrameRequestCallback[] = [];
+    let now = 1000;
+    const remote = ".mesh-vertex.kind-remote:not(.status-add)";
+    const builtin = ".mesh-vertex.kind-local:not(.status-add)";
+
+    beforeEach(() => {
+      queue = [];
+      now = 1000;
+      // 手动推进动画帧，让弹簧模拟在测试里完全确定
+      vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => queue.push(callback));
+      vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    async function frames(count: number, each?: () => void): Promise<void> {
+      for (let index = 0; index < count; index += 1) {
+        const callbacks = queue;
+        queue = [];
+        now += 17;
+        for (const callback of callbacks) callback(now);
+        await flushPromises();
+        each?.();
+      }
+    }
+
+    it("lets go of a dragged vertex without opening its details and keeps the edge attached", async () => {
+      await render();
+      await frames(300);
+      const before = position(remote);
+      await dragBy(remote, 60, -40);
+      const moved = position(remote);
+      expect(moved.x).toBeCloseTo(before.x + 60);
+      expect(moved.y).toBeCloseTo(before.y - 40);
+      await wrapper.find(remote).trigger("click");
+      expect((wrapper.find(".node-dialog").element as HTMLDialogElement).open).toBe(false);
+      const edge = wrapper.findAll(".mesh-edge.kind-remote:not(.status-add)")[0]!;
+      expect(Number(edge.attributes("x2"))).toBeCloseTo(moved.x);
+      expect(Number(edge.attributes("y2"))).toBeCloseTo(moved.y);
+    });
+
+    it("pulls the hub and the other vertices along while one vertex is held", async () => {
+      await render();
+      await frames(300);
+      const hubBefore = position(".mesh-hub");
+      const otherBefore = position(".mesh-vertex.kind-external:not(.status-add)");
+      await pointer(remote, "pointerdown", 100, 100);
+      await pointer(remote, "pointermove", 100 + 20, 100 + 70);
+      await frames(40);
+      const hubAfter = position(".mesh-hub");
+      expect(Math.hypot(hubAfter.x - hubBefore.x, hubAfter.y - hubBefore.y)).toBeGreaterThan(3);
+      const otherAfter = position(".mesh-vertex.kind-external:not(.status-add)");
+      expect(Math.hypot(otherAfter.x - otherBefore.x, otherAfter.y - otherBefore.y)).toBeGreaterThan(1);
+      // 每条连线都挂在 Hub 当前位置上
+      for (const edge of wrapper.findAll(".mesh-edge")) {
+        expect(Number(edge.attributes("x1"))).toBeCloseTo(hubAfter.x);
+        expect(Number(edge.attributes("y1"))).toBeCloseTo(hubAfter.y);
+      }
+    });
+
+    it("bounces past its home after release, then settles back where it started", async () => {
+      await render();
+      await frames(300);
+      const home = position(remote);
+      await dragBy(remote, 0, -70);
+      let farthest = home.y;
+      await frames(600, () => {
+        farthest = Math.max(farthest, position(remote).y);
+      });
+      expect(farthest).toBeGreaterThan(home.y + 1); // 冲过原位，说明有回弹
+      const rested = position(remote);
+      expect(Math.hypot(rested.x - home.x, rested.y - home.y)).toBeLessThan(1.5);
+      expect(queue).toHaveLength(0); // 静止后不再占用动画帧
+    });
+
+    it("treats tiny jitter as a click and pushes a vertex with the arrow keys", async () => {
+      await render();
+      await frames(300);
+      const before = position(builtin);
+      await dragBy(builtin, 1, 1);
+      expect(position(builtin)).toEqual(before);
+      await wrapper.find(builtin).trigger("click");
+      expect((wrapper.find(".node-dialog").element as HTMLDialogElement).open).toBe(true);
+      await wrapper.find(builtin).trigger("keydown", { key: "ArrowUp" });
+      await frames(4);
+      expect(position(builtin).y).toBeLessThan(before.y - 1);
+    });
+  });
+
   it("opens a detail dialog with grouped capabilities when a vertex is clicked", async () => {
     await render();
     await wrapper.find(".mesh-vertex.kind-remote:not(.status-add)").trigger("click");
