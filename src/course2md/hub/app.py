@@ -60,7 +60,7 @@ def create_app(
     accounts 为空时是本地模式：不需要登录，local_guard 检查 Host / Origin 防止其它网页调用本机服务。
     传入 :class:`course2md.core.accounts.Accounts` 时是服务器模式：所有接口需要登录，只检查写请求的来源。
     """
-    from ..jobs.manager import ConfirmationRequired
+    from ..jobs.job import ConfirmationRequired
 
     app = FastAPI(
         title="course2md",

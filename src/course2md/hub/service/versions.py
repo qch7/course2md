@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    ACTIVE_STATUSES,
-    JobManager,
-)
+from ...jobs.job import ACTIVE_STATUSES
+from ...jobs.manager import JobManager
 from .common import NotFound, get_job
 
 

@@ -3,292 +3,43 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import queue
-import re
-import shutil
 import threading
 import time
 import traceback
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-from markdown_it import MarkdownIt
-
 from ..config import (
     default_out_dir,
-    default_term_start,
     default_worker_dir,
 )
 from ..core.queue import TaskQueue
 from ..core.versions import NoteVersions
-from ..pipeline import JobResult, run_job
+from ..pipeline import run_job
 from ..resolvers import (
     course_identity,
-    parse_date,
-    resolve_term_start,
-    view_options,
-    week_of,
 )
-from ..stages.codec import options_from_dict, options_to_dict
 from ..stages.executor import QueueExecutor, Suspended
 from ..stages.options import JobOptions
 from ..storage import LocalFileStore
-from ..util.text import safe_name
-from .records import CourseRecord, CourseView, ExistingResult, MessageRecord, ResolvedCourse, SessionRecord, SessionView
+from .job import ChatRequest, Job, collect_files
+from .records import CourseRecord, CourseView, SessionView
+from .serialization import job_from_record, job_to_record
+from .sessions import existing_result
+from .trash import TrashService
 from .workspace_store import WorkspaceStore
 
 if TYPE_CHECKING:
     from ..worker import LocalNodeManager, WorkerRunner
 
-ACTIVE_STATUSES = ("queued", "running")
-TRASH_SECONDS = 30 * 24 * 3600  # 回收站保留期
-PURGE_INTERVAL = 3600.0
 FORMATS = ("srt", "vtt", "txt", "md", "json")
 
 
-def _markdown_html(text: str) -> str:
-    return MarkdownIt("commonmark", {"html": False}).disable("image").render(text)
-
-
 T = TypeVar("T")
-
-
-@dataclass
-class Job:
-    """课程任务及后续对话，输出游标在缓冲区裁剪后继续单调递增。"""
-
-    id: str
-    source: str
-    title: str
-    out_dir: Path
-    course: str = ""
-    course_id: str = ""
-    session_id: str = ""
-    session_date: str = ""
-    week: int | None = None
-    status: str = "queued"
-    stage: str = "排队"
-    progress: float = 0.0
-    sub: float | None = None
-    message: str = "等待执行"
-    logs: list[str] = field(default_factory=list)
-    files: list[dict[str, str]] = field(default_factory=list)
-    error: str = ""
-    cancel: threading.Event = field(default_factory=threading.Event)
-    started_at: float = field(default_factory=time.time)
-    _log_bucket: tuple[str, int] = ("", -1)
-    agent: str = ""
-    agent_model: str = ""
-    owner: str = "local"  # 所属用户：本地模式为 local，服务器形态为用户编号
-    deleted_at: float | None = None  # 移入回收站的时间；超过保留期后永久删除
-    timings: dict[str, float] = field(default_factory=dict)
-    events: list[dict] = field(default_factory=list)
-    messages: list[MessageRecord] = field(default_factory=list)
-    pending_messages: int = 0
-    revision: int = 0
-    options: JobOptions | None = field(default=None, repr=False)
-    result: JobResult | None = field(default=None, repr=False)
-    reuse: frozenset = field(default_factory=frozenset, repr=False)  # 下次运行复用之前结果的阶段
-    run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
-    active_operation: str = "pipeline"
-    _event_seq: int = 0
-    _log_count: int = 0
-    _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
-    _html_cache: dict = field(default_factory=dict, repr=False)
-
-    def _message_html(self, message: MessageRecord) -> str:
-        """助手消息按内容缓存渲染结果，轮询时不重复解析 Markdown。"""
-        if message["role"] != "assistant":
-            return ""
-        key = (message.get("id"), message["text"])
-        if key not in self._html_cache:
-            self._html_cache[key] = _markdown_html(message["text"])
-        return self._html_cache[key]
-
-    def locked(self) -> AbstractContextManager[bool]:
-        """持有任务状态的锁；跨模块修改任务字段必须走它，不要直接访问 ``_lock``。"""
-        return self._lock
-
-    def log(self, text: str) -> None:
-        with self._lock:
-            self.logs.append(f"[{time.strftime('%H:%M:%S')}] {text}")
-            self._log_count += 1
-            del self.logs[:-500]
-
-    def emit(self, event: dict) -> None:
-        with self._lock:
-            self._event_seq += 1
-            text = str(event.get("text", ""))
-            self.events.append(
-                {
-                    **event,
-                    "text": text[:65536],
-                    "truncated": len(text) > 65536 or event.get("truncated", False),
-                    "seq": self._event_seq,
-                    "time": time.time(),
-                }
-            )
-            del self.events[:-400]
-
-    def snapshot(self, since: int = 0, after: int = 0) -> dict:
-        with self._lock:
-            log_start = self._log_count - len(self.logs)
-            return {
-                "id": self.id,
-                "source": self.source,
-                "title": self.title,
-                "out_dir": str(self.out_dir),
-                "status": self.status,
-                "stage": self.stage,
-                "course": self.course,
-                "session_date": self.session_date,
-                "week": self.week,
-                "course_id": self.course_id,
-                "session_id": self.session_id,
-                "progress": round(self.progress, 4),
-                "sub": self.sub,
-                "message": self.message,
-                "logs": self.logs[max(0, since - log_start) :],
-                "log_offset": self._log_count,
-                "files": list(self.files),
-                "error": self.error,
-                "agent": self.agent,
-                "agent_model": self.agent_model,
-                "timings": dict(self.timings),
-                "started_at": self.started_at,
-                "events": [dict(event) for event in self.events if event["seq"] > after],
-                "event_offset": self._event_seq,
-                "messages": [{**message, "html": self._message_html(message)} for message in self.messages],
-                "pending_messages": self.pending_messages,
-                "revision": self.revision,
-                "can_chat": bool(
-                    self.options
-                    and self.options.ai
-                    and ((self.result and self.result.note_workspace) or self.status in ("queued", "running"))
-                ),
-            }
-
-
-@dataclass
-class ChatRequest:
-    """排入同一课程队列的用户请求。"""
-
-    id: str
-    text: str
-
-
-class ConfirmationRequired(Exception):
-    """需要用户二次确认（例如覆盖已有结果）才能继续提交。"""
-
-    def __init__(self, payload: dict) -> None:
-        super().__init__(payload.get("error") or "需要确认")
-        self.payload = payload
-
-
-_TITLE_DATE = re.compile(r"[ _\-]?(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2}))?")
-_TIME_PART = re.compile(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})")
-
-
-def _session_folder(session, course: str = "") -> str:
-    """课次在课程文件夹下的名字：优先「日期 时-分」，其次标题。"""
-    begin = session.meta.get("begin") or session.date or ""
-    found = _TIME_PART.search(begin)
-    if found:
-        return f"{found[1]} {found[2]}-{found[3]}"
-    if session.date:
-        return session.date
-    title = session.title
-    if course and title.startswith(course):
-        title = title[len(course) :].strip()
-    return safe_name(title or session.session_id, session.session_id or "session")
-
-
-def _existing_result(folder: Path) -> ExistingResult | None:
-    """检查课次目录里是否已有上一次的结果（完整或中断）。"""
-    try:
-        if not folder.is_dir():
-            return None
-        entries = list(folder.iterdir())
-    except OSError:
-        return None
-    if not any(entry.is_file() for entry in entries):
-        return None
-    notes: list[str] = []
-    updated = 0.0
-    note_dir = folder / "notes"
-    note_entries = [*entries, *note_dir.glob("*.md")]
-    for path in note_entries:
-        try:
-            updated = max(updated, path.stat().st_mtime)
-        except OSError:
-            continue
-        if path.is_file() and path.name.endswith((".notes.md", ".brief.md")):
-            notes.append(path.relative_to(folder).as_posix())
-    complete = False
-    manifest = folder / "job.json"
-    if manifest.is_file():
-        try:
-            data = json.loads(manifest.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = {}
-        detailed = data.get("detailed_notes")
-        complete = bool(notes) and bool(detailed) and Path(detailed).is_file()
-    return {
-        "path": str(folder),
-        "complete": complete,
-        "file_count": len(entries),
-        "updated_at": round(updated, 3),
-        "notes": sorted(notes),
-    }
-
-
-def _resolver_fields(resolver, source: str) -> dict[str, Any]:
-    """解析器提供给界面的信息：名称、显示名与可选机位。"""
-    return {
-        "resolver": resolver.name,
-        "resolver_label": getattr(resolver, "label", "") or resolver.name,
-        "view_options": [
-            {"id": option.id, "label": option.label, "default": option.default}
-            for option in view_options(resolver, source)
-        ],
-    }
-
-
-def _describe_sessions(sessions, root: Path, configured: str = "") -> ResolvedCourse:
-    hint = next((session.meta.get("term_start") for session in sessions if session.meta.get("term_start")), "")
-    term_start, basis = resolve_term_start(
-        configured or default_term_start(), hint, [session.date for session in sessions]
-    )
-    payload: list[SessionRecord] = []
-    for session in sessions:
-        day = parse_date(session.date)
-        week = week_of(day, term_start) if day and term_start else None
-        folder = (
-            root / safe_name(session.course, "未分类") / safe_name(_session_folder(session, session.course), "session")
-        )
-        payload.append(
-            {
-                "id": session.session_id,
-                "date": session.date,
-                "title": session.title,
-                "views": session.views,
-                "week": week,
-                "course": session.course,
-                "meta": session.meta,
-                "folder": str(folder),
-            }
-        )
-    return {
-        "course": sessions[0].course if sessions else "",
-        "sessions": payload,
-        "term_start": term_start.isoformat() if term_start else "",
-        "term_source": basis,
-    }
 
 
 class JobManager:
@@ -323,11 +74,12 @@ class JobManager:
         self.courses = {course["id"]: course for course in self.store.load_courses()}
         for data in self.store.load_jobs():
             try:
-                job = self._restore_job(data)
+                job = job_from_record(data)
                 self.jobs[job.id] = job
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 self.warnings.append(f"任务 {data.get('id', '')} 读取失败（{exc}）")
         self.queue = TaskQueue(self.store.db, LocalFileStore(data_dir / "objects"))
+        self.trash = TrashService(self, self._closing)
         self.versions = NoteVersions(self.store.db, self.queue.store)
         from ..worker import HubLinkManager, LocalNodeManager, detect_capabilities
         from ..worker.local import BUILTIN_ID
@@ -360,8 +112,7 @@ class JobManager:
                 for message in job.messages:
                     if message["role"] == "user" and message.get("status") == "queued":
                         self._queue.put((job, ChatRequest(message["id"], message["text"])))
-        self._janitor = threading.Thread(target=self._purge_loop, daemon=True)
-        self._janitor.start()
+        self.trash.start()
 
     def locked(self) -> AbstractContextManager[bool]:
         """持有管理器级的锁，保护 ``jobs`` / ``courses`` 两张表。
@@ -386,100 +137,6 @@ class JobManager:
         if self.local_nodes is None:
             return None
         return self.local_nodes.runner(self._builtin_id)
-
-    # ------------------------------------------------------------ 回收站
-    def mark_job_deleted(self, job: Job, when: float | None) -> None:
-        """移入（when 为时间戳）或移出（None）回收站。"""
-        with job.locked():
-            job.deleted_at = when
-        self.save_job(job)
-
-    def mark_course_deleted(self, course: CourseRecord, when: float | None) -> None:
-        with self._lock:
-            if when is None:
-                course.pop("deleted_at", None)
-            else:
-                course["deleted_at"] = when
-            self.store.save_course(course)
-
-    def course_jobs(self, course: CourseRecord) -> list[Job]:
-        with self._lock:
-            return [
-                job for job in self.jobs.values() if job.course_id == course["id"] and job.owner == course.get("owner")
-            ]
-
-    def purge_job(self, job: Job) -> None:
-        """永久删除任务：数据库记录、阶段记录与版本；服务器形态下还删除其输出目录。
-
-        本地应用的输出目录由用户自己选择（可能是知识库），只清理记录，不删除用户磁盘上的文件。
-        """
-        with self._lock:
-            self.jobs.pop(job.id, None)
-        self.store.delete_job(job.id)
-        self.queue.discard_job(job.id)
-        self.versions.discard(job.id)
-        if self.mode == "server":
-            self._remove_output(job.out_dir)
-
-    def purge_course(self, course: CourseRecord) -> None:
-        for job in self.course_jobs(course):
-            if job.status in ACTIVE_STATUSES:
-                continue
-            self.purge_job(job)
-        with self._lock:
-            if self.course_jobs(course):
-                return  # 仍有活动任务，稍后再清理
-            self.courses.pop(course["id"], None)
-        self.store.delete_course(course["id"])
-
-    def purge_deleted(self, now: float | None = None, retention: float = TRASH_SECONDS) -> int:
-        """永久删除超过保留期的回收站内容，返回清理的任务数。"""
-        cutoff = (time.time() if now is None else now) - retention
-        with self._lock:
-            jobs = [
-                job
-                for job in self.jobs.values()
-                if job.deleted_at is not None and job.deleted_at <= cutoff and job.status not in ACTIVE_STATUSES
-            ]
-            courses = [
-                course
-                for course in self.courses.values()
-                if (deleted_at := course.get("deleted_at")) and deleted_at <= cutoff
-            ]
-        for job in jobs:
-            self.purge_job(job)
-        for course in courses:
-            self.purge_course(course)
-        return len(jobs)
-
-    def _remove_output(self, out_dir: Path) -> None:
-        """只删除服务器托管目录（输出根目录下的 users/）内的内容，并清理变空的课程文件夹。"""
-        base = (Path(default_out_dir()).expanduser().resolve() / "users").resolve()
-        target = Path(out_dir).resolve()
-        if target == base or not target.is_relative_to(base):
-            return
-        shutil.rmtree(target, ignore_errors=True)
-        parent = target.parent
-        # 只清理变空的课程文件夹，保留 users/<用户编号> 这一层
-        while parent.parent != base and parent.is_relative_to(base):
-            try:
-                parent.rmdir()  # 非空时抛出 OSError，保留
-            except OSError:
-                break
-            parent = parent.parent
-
-    def prune_objects(self, grace_seconds: float = 3600.0, now: float | None = None) -> int:
-        """回收对象存储中已无引用且超过宽限期的孤立对象（如已发布的临时上传块、已清除任务的产物）。"""
-        return self.queue.prune_unreferenced_objects(grace_seconds=grace_seconds, now=now)
-
-    def _purge_loop(self) -> None:
-        while not self._closing.is_set():
-            try:
-                self.purge_deleted()
-                self.prune_objects()
-            except Exception as exc:  # noqa: BLE001  清理失败不应影响服务，下个周期重试
-                self.warnings.append(f"清理回收站失败（{exc}）")
-            self._closing.wait(PURGE_INTERVAL)
 
     def submit(self, job: Job, options: JobOptions) -> Job:
         if getattr(self, "_closing", threading.Event()).is_set():
@@ -542,7 +199,7 @@ class JobManager:
             sessions.append(
                 {
                     **session,
-                    "existing": _existing_result(Path(session["folder"])),
+                    "existing": existing_result(Path(session["folder"])),
                     "job_id": current.id if current else "",
                     "status": current.status if current else "",
                 }
@@ -593,59 +250,7 @@ class JobManager:
 
     def save_job(self, job: Job, replace_existing: bool = False) -> None:
         with job.locked():
-            data = {
-                item.name: getattr(job, item.name)
-                for item in fields(Job)
-                if not item.name.startswith("_") and item.name not in ("cancel", "options", "result", "reuse")
-            }
-            data["reuse"] = sorted(job.reuse)
-            data["cancel_requested"] = job.cancel.is_set()
-            data["options"] = options_to_dict(job.options) if job.options else None
-            data["result"] = (
-                {
-                    name: str(getattr(job.result, name)) if getattr(job.result, name) else None
-                    for name in ("notes", "detailed_notes", "brief_notes", "note_workspace")
-                }
-                if job.result
-                else None
-            )
-            data["log_offset"], data["event_offset"] = job._log_count, job._event_seq
-            self.store.save_job(data, replace_existing=replace_existing)
-
-    def _restore_job(self, data: dict) -> Job:
-        values = {
-            item.name: data[item.name]
-            for item in fields(Job)
-            if item.name in data and not item.name.startswith("_") and item.name not in ("cancel", "options", "result")
-        }
-        values["out_dir"] = Path(values["out_dir"])
-        values["reuse"] = frozenset(values.get("reuse") or ())
-        job = Job(**values)
-        if data.get("cancel_requested"):
-            job.cancel.set()
-        if data.get("options"):
-            job.options = options_from_dict(data["options"])
-        result = data.get("result")
-        if result:
-            job.result = JobResult(
-                output_dir=job.out_dir,
-                timings=job.timings,
-                **{key: Path(value) if value else None for key, value in result.items()},  # type: ignore[arg-type]
-            )
-        if job.out_dir.is_dir():
-            job.files = _collect_files(job.result or JobResult(output_dir=job.out_dir))
-        job._log_count = data["log_offset"]
-        job._event_seq = data["event_offset"]
-        if job.status in ACTIVE_STATUSES:
-            job.status, job.stage, job.message = "queued", "恢复", "服务已重启，正在接续未完成阶段"
-            job.sub = None
-        job.pending_messages = 0
-        for message in job.messages:
-            if message.get("status") in ACTIVE_STATUSES:
-                message["status"] = "queued"
-                if message["role"] == "user":
-                    job.pending_messages += 1
-        return job
+            self.store.save_job(job_to_record(job), replace_existing=replace_existing)
 
     def _dispatch(self) -> None:
         """不同课程独立编排，同一课程的整理与对话严格串行。"""
@@ -726,7 +331,7 @@ class JobManager:
                 )
                 result = run_job(options, progress=progress, cancel=job.cancel, on_output=job.emit, executor=executor)
                 job.result = result
-                job.files = _collect_files(result)
+                job.files = collect_files(result)
                 job.revision += 1
             except Suspended:
                 job.status, job.stage, job.message = "queued", "恢复", "等待服务重启后继续"
@@ -821,7 +426,7 @@ class JobManager:
                     job.emit,
                     job.cancel,
                 )
-            job.files = _collect_files(job.result)
+            job.files = collect_files(job.result)
             if reply.updated:
                 job.revision += 1
                 self.record_version(job, f"对话：{request.text[:40]}")
@@ -864,40 +469,3 @@ class JobManager:
                     }
                 )
         self.save_job(job)
-
-
-def _collect_files(result) -> list[dict[str, str]]:
-    """列出可下载的产物（相对输出目录）。"""
-    files: list[dict[str, str]] = []
-    for path in sorted(result.output_dir.rglob("*")):
-        if (
-            not path.is_file()
-            or path.suffix in (".wav", ".part", ".lock")
-            or "agent-workspace" in path.relative_to(result.output_dir).parts
-            or ".course2md" in path.relative_to(result.output_dir).parts
-        ):
-            continue
-        kind = "text"
-        if path in (result.notes, result.detailed_notes, result.brief_notes):
-            kind = "notes"
-        elif path.suffix == ".json":
-            kind = "meta"
-        elif path.suffix == ".zip":
-            kind = "bundle"
-        elif path.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
-            kind = "image"
-        elif path.suffix.lower() in (".mp4", ".mkv", ".mov", ".avi", ".ts"):
-            kind = "media"
-        files.append(
-            {
-                "name": path.name,
-                "rel": str(path.relative_to(result.output_dir)).replace("\\", "/"),
-                "size": f"{path.stat().st_size / 1024:.0f} KB",
-                "kind": kind,
-            }
-        )
-    primary = result.notes.relative_to(result.output_dir).as_posix() if result.notes else ""
-    return sorted(
-        files,
-        key=lambda item: (0 if item["rel"] == primary else {"notes": 1, "bundle": 2}.get(item["kind"], 3), item["rel"]),
-    )

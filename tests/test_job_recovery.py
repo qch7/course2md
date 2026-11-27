@@ -2,7 +2,8 @@
 
 import threading
 
-from course2md.jobs.manager import Job, JobManager
+from course2md.jobs.job import Job
+from course2md.jobs.manager import JobManager
 from course2md.pipeline import JobResult
 from course2md.stages.base import StageContext
 from course2md.stages.codec import cache_key, options_to_dict

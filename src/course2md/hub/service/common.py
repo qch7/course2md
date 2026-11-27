@@ -9,10 +9,8 @@ from ...config import (
     default_out_dir,
 )
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    Job,
-    JobManager,
-)
+from ...jobs.job import Job
+from ...jobs.manager import JobManager
 from ...jobs.records import CourseRecord
 
 

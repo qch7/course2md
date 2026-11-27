@@ -6,9 +6,7 @@ import platform
 from typing import Any
 
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    JobManager,
-)
+from ...jobs.manager import JobManager
 from .common import Forbidden, NotFound, server_mode
 
 

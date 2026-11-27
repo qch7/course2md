@@ -34,7 +34,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
 |---|---|---|
 | 入口 | `cli` | 命令行 |
 | 接口 | `hub` | FastAPI 应用、`/api/v1`、节点接口、登录；`hub/service/` 是与 HTTP 无关的业务封装，按领域拆成子模块 |
-| 应用 | `jobs` | 任务与课程生命周期：提交、恢复、对话、版本、持久化 |
+| 应用 | `jobs` | 任务与课程生命周期：`manager` 编排，`job` 运行时对象，`records` 记录结构，`serialization` 入库转换，`trash` 回收站，`bundle` 产物包 |
 | 节点 | `worker` | 领取并执行阶段任务、能力检测、与 Hub 通信 |
 | 编排 | `pipeline` | 按顺序把阶段交给执行器，写 `job.json` |
 | 阶段 | `stages` | 各阶段实现、阶段注册表、任务选项、产物、执行器、编解码 |

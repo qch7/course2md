@@ -21,9 +21,7 @@ from ...config import (
     find_model,
 )
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    JobManager,
-)
+from ...jobs.manager import JobManager
 from ...resolvers import (
     available,
 )

@@ -24,7 +24,8 @@ from ..util.job_refs import from_job_refs, to_job_refs
 from ..util.text import safe_name
 
 if TYPE_CHECKING:
-    from .manager import Job, JobManager
+    from .job import Job
+    from .manager import JobManager
 
 IMPORTED_WORKER = "imported"
 

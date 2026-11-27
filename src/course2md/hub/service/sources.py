@@ -7,11 +7,8 @@ import uuid
 
 from ...core.accounts import LOCAL_USER, User
 from ...errors import Course2mdError
-from ...jobs.manager import (
-    JobManager,
-    _describe_sessions,
-    _resolver_fields,
-)
+from ...jobs.manager import JobManager
+from ...jobs.sessions import describe_sessions, resolver_fields
 from ...resolvers import (
     ResolverError,
     get_resolver,
@@ -126,7 +123,7 @@ def resolve_source(manager: JobManager, body: dict, user: User = LOCAL_USER) -> 
         get_course(manager, body["course_id"], user)
     sessions = list_sessions(manager, source, resolver, user)
     root = output_root(manager, user, body.get("out_dir"))
-    resolved = {**_describe_sessions(sessions, root, body.get("term_start", "")), **_resolver_fields(resolver, source)}
+    resolved = {**describe_sessions(sessions, root, body.get("term_start", "")), **resolver_fields(resolver, source)}
     course = manager.remember_course(source, root, resolved, body.get("course_id", ""), owner=user.id)
     snapshot = manager.course_snapshot(course)
     return {**snapshot, "course_id": course["id"]}

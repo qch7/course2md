@@ -14,11 +14,8 @@ from ...config import (
     default_agent,
 )
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    ACTIVE_STATUSES,
-    Job,
-    JobManager,
-)
+from ...jobs.job import ACTIVE_STATUSES, Job
+from ...jobs.manager import JobManager
 from ...jobs.records import CourseView
 from ...stages.registry import PIPELINE_STAGES, STAGE_LABELS
 from .common import Forbidden, NotFound, get_job, job_file, request_cancel, server_mode, visible

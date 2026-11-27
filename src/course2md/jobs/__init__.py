@@ -4,7 +4,8 @@
 本包不依赖任何 HTTP 框架，HTTP 接口见 :mod:`course2md.hub`。
 """
 
-from .manager import ACTIVE_STATUSES, ConfirmationRequired, Job, JobManager
+from .job import ACTIVE_STATUSES, ConfirmationRequired, Job
+from .manager import JobManager
 from .workspace_store import WorkspaceStore
 
 __all__ = ["ACTIVE_STATUSES", "ConfirmationRequired", "Job", "JobManager", "WorkspaceStore"]
