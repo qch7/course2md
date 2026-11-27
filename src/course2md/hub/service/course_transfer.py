@@ -13,6 +13,7 @@ from ...jobs.manager import (
     Job,
     JobManager,
 )
+from ...jobs.records import CourseRecord
 from ...util.text import safe_name
 from .common import NotFound, get_course, get_job, output_root, server_mode, visible
 
@@ -224,7 +225,7 @@ def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
     raw_job_ids = body.get("job_ids")
     course_id = str(body.get("course_id") or "").strip()
 
-    groups: list[tuple[dict[str, Any] | None, list[Job]]] = []
+    groups: list[tuple[CourseRecord | None, list[Job]]] = []
     if isinstance(raw_job_ids, list) and raw_job_ids:
         by_course: dict[str, list[Job]] = {}
         for jid in dict.fromkeys(str(item).strip() for item in raw_job_ids if str(item).strip()):

@@ -11,7 +11,7 @@ import threading
 import time
 import traceback
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -39,6 +39,7 @@ from ..stages.executor import QueueExecutor, Suspended
 from ..stages.options import JobOptions
 from ..storage import LocalFileStore
 from ..util.text import safe_name
+from .records import CourseRecord, CourseView, ExistingResult, MessageRecord, ResolvedCourse, SessionRecord, SessionView
 from .workspace_store import WorkspaceStore
 
 if TYPE_CHECKING:
@@ -87,7 +88,7 @@ class Job:
     deleted_at: float | None = None  # 移入回收站的时间；超过保留期后永久删除
     timings: dict[str, float] = field(default_factory=dict)
     events: list[dict] = field(default_factory=list)
-    messages: list[dict] = field(default_factory=list)
+    messages: list[MessageRecord] = field(default_factory=list)
     pending_messages: int = 0
     revision: int = 0
     options: JobOptions | None = field(default=None, repr=False)
@@ -100,7 +101,7 @@ class Job:
     _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
     _html_cache: dict = field(default_factory=dict, repr=False)
 
-    def _message_html(self, message: dict) -> str:
+    def _message_html(self, message: MessageRecord) -> str:
         """助手消息按内容缓存渲染结果，轮询时不重复解析 Markdown。"""
         if message["role"] != "assistant":
             return ""
@@ -207,7 +208,7 @@ def _session_folder(session, course: str = "") -> str:
     return safe_name(title or session.session_id, session.session_id or "session")
 
 
-def _existing_result(folder: Path) -> dict | None:
+def _existing_result(folder: Path) -> ExistingResult | None:
     """检查课次目录里是否已有上一次的结果（完整或中断）。"""
     try:
         if not folder.is_dir():
@@ -246,7 +247,7 @@ def _existing_result(folder: Path) -> dict | None:
     }
 
 
-def _resolver_fields(resolver, source: str) -> dict:
+def _resolver_fields(resolver, source: str) -> dict[str, Any]:
     """解析器提供给界面的信息：名称、显示名与可选机位。"""
     return {
         "resolver": resolver.name,
@@ -258,12 +259,12 @@ def _resolver_fields(resolver, source: str) -> dict:
     }
 
 
-def _describe_sessions(sessions, root: Path, configured: str = "") -> dict:
+def _describe_sessions(sessions, root: Path, configured: str = "") -> ResolvedCourse:
     hint = next((session.meta.get("term_start") for session in sessions if session.meta.get("term_start")), "")
     term_start, basis = resolve_term_start(
         configured or default_term_start(), hint, [session.date for session in sessions]
     )
-    payload = []
+    payload: list[SessionRecord] = []
     for session in sessions:
         day = parse_date(session.date)
         week = week_of(day, term_start) if day and term_start else None
@@ -301,7 +302,7 @@ class JobManager:
         mode: str = "local",
     ) -> None:
         self.jobs: dict[str, Job] = {}
-        self.courses: dict[str, dict] = {}
+        self.courses: dict[str, CourseRecord] = {}
         self.warnings: list[str] = []
         # 服务器形态下为 server，按用户隔离并限制可用操作；内置节点的能力也随形态不同，所以要在构造时给定
         self.mode = mode
@@ -393,7 +394,7 @@ class JobManager:
             job.deleted_at = when
         self.save_job(job)
 
-    def mark_course_deleted(self, course: dict, when: float | None) -> None:
+    def mark_course_deleted(self, course: CourseRecord, when: float | None) -> None:
         with self._lock:
             if when is None:
                 course.pop("deleted_at", None)
@@ -401,7 +402,7 @@ class JobManager:
                 course["deleted_at"] = when
             self.store.save_course(course)
 
-    def course_jobs(self, course: dict) -> list[Job]:
+    def course_jobs(self, course: CourseRecord) -> list[Job]:
         with self._lock:
             return [
                 job for job in self.jobs.values() if job.course_id == course["id"] and job.owner == course.get("owner")
@@ -420,7 +421,7 @@ class JobManager:
         if self.mode == "server":
             self._remove_output(job.out_dir)
 
-    def purge_course(self, course: dict) -> None:
+    def purge_course(self, course: CourseRecord) -> None:
         for job in self.course_jobs(course):
             if job.status in ACTIVE_STATUSES:
                 continue
@@ -443,7 +444,7 @@ class JobManager:
             courses = [
                 course
                 for course in self.courses.values()
-                if course.get("deleted_at") and course["deleted_at"] <= cutoff
+                if (deleted_at := course.get("deleted_at")) and deleted_at <= cutoff
             ]
         for job in jobs:
             self.purge_job(job)
@@ -494,8 +495,8 @@ class JobManager:
         return job
 
     def remember_course(
-        self, source: str, root: Path, resolved: dict, course_id: str = "", owner: str = "local"
-    ) -> dict:
+        self, source: str, root: Path, resolved: Mapping[str, Any], course_id: str = "", owner: str = "local"
+    ) -> CourseRecord:
         """保存解析信息。解析器提供的课程标识在更换凭证后保持不变，因此会复用同一课程记录。
 
         不同用户解析同一来源时得到各自的课程记录。
@@ -503,19 +504,22 @@ class JobManager:
         identity = course_identity(source)
         key = hashlib.sha256(f"{owner}\n{root}\n{identity}".encode()).hexdigest()[:20]
         with self._lock:
-            previous = self.courses.get(course_id) or self.courses.get(key) or {}
+            previous: Mapping[str, Any] = self.courses.get(course_id) or self.courses.get(key) or {}
             if previous.get("owner", owner) != owner:
                 previous = {}
-            course = {
-                **previous,
-                **resolved,
-                "id": previous.get("id") or key,
-                "owner": owner,
-                "source": source,
-                "out_dir": str(root),
-                "title": resolved.get("course") or previous.get("title") or Path(source).stem or "课程",
-                "updated_at": time.time(),
-            }
+            course = cast(
+                CourseRecord,
+                {
+                    **previous,
+                    **resolved,
+                    "id": previous.get("id") or key,
+                    "owner": owner,
+                    "source": source,
+                    "out_dir": str(root),
+                    "title": resolved.get("course") or previous.get("title") or Path(source).stem or "课程",
+                    "updated_at": time.time(),
+                },
+            )
             course.pop("deleted_at", None)  # 重新解析同一来源视为恢复该课程；其下已删除的任务仍留在回收站
             # 没有解析到课次时（例如任务创建时解析失败），保留已经保存的完整课次。
             if not resolved.get("sessions") and previous.get("sessions"):
@@ -526,10 +530,10 @@ class JobManager:
             self.courses[course["id"]] = course
             return course
 
-    def course_snapshot(self, course: dict) -> dict:
+    def course_snapshot(self, course: CourseRecord) -> CourseView:
         with self._lock:
             related = [job for job in self.jobs.values() if job.course_id == course["id"] and job.deleted_at is None]
-        sessions = []
+        sessions: list[SessionView] = []
         for session in course.get("sessions", []):
             current = next(
                 (job for job in related if job.session_id == session["id"] or str(job.out_dir) == session["folder"]),
