@@ -89,7 +89,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
 
 ### 新增 HTTP 接口
 
-路由写在 `hub/api/`，业务逻辑写在 `hub/service/` 下对应领域的子模块（并在其 `__init__.py` 导出）或 `jobs/`，请求与响应模型写在 `hub/schemas.py` 和 `hub/responses.py`。
+路由写在 `hub/api/v1/` 下对应领域的模块（`jobs`、`courses`、`compute`、`transfer` 等，在包的 `__init__.py` 登记），业务逻辑写在 `hub/service/` 下对应领域的子模块（并在其 `__init__.py` 导出）或 `jobs/`，请求与响应模型写在 `hub/schemas.py` 和 `hub/responses.py`。
 改动后导出 OpenAPI，并在 `web/` 重新生成类型。`/api/v1` 的破坏性改动只能进入下一个主版本。
 
 ## 编码规范
