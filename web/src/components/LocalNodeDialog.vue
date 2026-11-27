@@ -2,7 +2,7 @@
 import { computed, reactive, ref, useId } from "vue";
 
 import type { LocalNode } from "@/api/client";
-import { groupCapabilities } from "@/utils/capabilities";
+import { type CapabilityItem, groupCapabilities } from "@/utils/capabilities";
 
 export interface LocalNodeForm {
   name: string;
@@ -48,11 +48,13 @@ function close(): void {
   dialog.value?.close();
 }
 
-function toggle(name: string, checked: boolean): void {
-  const next = new Set(form.capabilities);
-  if (checked) next.add(name);
-  else next.delete(name);
-  form.capabilities = [...next].sort();
+/** 一个勾选项可能代表多个能力名（解析器及其带版本的声明），要一起增减。 */
+function isChecked(item: CapabilityItem): boolean {
+  return item.names.some((name) => form.capabilities.includes(name));
+}
+
+function toggle(item: CapabilityItem, checked: boolean): void {
+  toggleGroup(item.names, checked);
 }
 
 function toggleGroup(names: string[], checked: boolean): void {
@@ -114,20 +116,20 @@ defineExpose({ openCreate, openEdit, close });
                 class="text-button"
                 @click="
                   toggleGroup(
-                    group.items.map((item) => item.name),
-                    !group.items.every((item) => form.capabilities.includes(item.name)),
+                    group.items.flatMap((item) => item.names),
+                    !group.items.every(isChecked),
                   )
                 "
               >
-                {{ group.items.every((item) => form.capabilities.includes(item.name)) ? "全不选" : "全选" }}
+                {{ group.items.every(isChecked) ? "全不选" : "全选" }}
               </button>
             </legend>
             <div class="check-row">
               <label v-for="item in group.items" :key="item.name" :title="item.hint || item.name">
                 <input
                   type="checkbox"
-                  :checked="form.capabilities.includes(item.name)"
-                  @change="toggle(item.name, ($event.target as HTMLInputElement).checked)"
+                  :checked="isChecked(item)"
+                  @change="toggle(item, ($event.target as HTMLInputElement).checked)"
                 />
                 {{ item.label }}
               </label>

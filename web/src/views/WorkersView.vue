@@ -3,13 +3,13 @@ import { useQuery } from "@tanstack/vue-query";
 import { computed, reactive, ref } from "vue";
 
 import { client, type HubLink, type LocalNode, unwrap, type Worker } from "@/api/client";
+import CapabilityTags from "@/components/CapabilityTags.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import LocalNodeDialog, { type LocalNodeForm } from "@/components/LocalNodeDialog.vue";
 import MeshTopology, { type MeshKind, type MeshNode, type MeshStatus } from "@/components/MeshTopology.vue";
 import NodeDetailDialog, { type DetailAction, type DetailTarget } from "@/components/NodeDetailDialog.vue";
 import { isAdmin, session } from "@/stores/session";
 import { showError, toast, ui } from "@/stores/ui";
-import { capabilityLabel as label } from "@/utils/capabilities";
 import { dateTime } from "@/utils/format";
 
 const workers = useQuery({
@@ -614,16 +614,16 @@ async function copy(text: string): Promise<void> {
     <div class="course-heading"><h1>计算服务</h1></div>
   </header>
   <div class="workspace-content">
-    <div class="page">
+    <div class="page workers-page">
       <p class="hint">
         {{
           canManageLinks
-            ? "计算服务支持网状互联：本机既可接收其它节点连入，也可同时作为计算节点连入多个外部 Hub；本地与外部任务共用显存自动排队，下载的视频留在节点上。"
+            ? "本机既是接收其它节点连入的 Hub，也可以作为计算节点连入多个外部 Hub。本地与外部任务共用显存自动排队，下载的视频留在节点上。"
             : "转写、画面与整理由具备相应能力的计算节点完成。节点主动连接 Hub，不需要公网地址；下载的视频留在节点上。"
         }}
       </p>
 
-      <section class="panel mesh-panel" aria-label="网状计算拓扑">
+      <section class="mesh-card" aria-label="网状计算拓扑">
         <MeshTopology
           :hub="meshHub"
           :local="meshLocal"
@@ -634,46 +634,55 @@ async function copy(text: string): Promise<void> {
           @select="openNode"
           @add="addFromGraph"
         />
-        <ul class="mesh-legend">
-          <li class="kind-hub">
-            <span class="swatch"></span><strong>本机 Hub</strong><small>调度中心</small>
-          </li>
-          <li class="kind-local">
-            <span class="swatch"></span><strong>本机节点</strong
-            ><small>{{ meshCounts.local.online }} / {{ meshCounts.local.total }} 在线</small>
-          </li>
-          <li class="kind-remote">
-            <span class="swatch"></span><strong>连入的节点</strong
-            ><small>{{ meshCounts.remote.online }} / {{ meshCounts.remote.total }} 在线</small>
-          </li>
-          <li v-if="canManageLinks" class="kind-external">
-            <span class="swatch"></span><strong>外部 Hub</strong
-            ><small>{{ meshCounts.external.online }} / {{ meshCounts.external.total }} 在线</small>
-          </li>
-        </ul>
-        <p class="hint">点击图中的 Hub 或节点查看详情与能力；虚线表示离线，流动的线表示正在执行任务。</p>
+        <div class="mesh-foot">
+          <ul class="mesh-legend">
+            <li class="kind-hub"><span class="swatch"></span><strong>本机 Hub</strong></li>
+            <li class="kind-local">
+              <span class="swatch"></span><strong>本机节点</strong
+              ><small>{{ meshCounts.local.online }} / {{ meshCounts.local.total }} 在线</small>
+            </li>
+            <li class="kind-remote">
+              <span class="swatch"></span><strong>连入的节点</strong
+              ><small>{{ meshCounts.remote.online }} / {{ meshCounts.remote.total }} 在线</small>
+            </li>
+            <li v-if="canManageLinks" class="kind-external">
+              <span class="swatch"></span><strong>外部 Hub</strong
+              ><small>{{ meshCounts.external.online }} / {{ meshCounts.external.total }} 在线</small>
+            </li>
+          </ul>
+          <span class="mesh-tip">点击查看详情，可拖动 · 虚线离线，流动的线执行中</span>
+        </div>
       </section>
 
-      <section v-if="canManageLocalNodes" id="section-local-nodes" class="panel">
-        <div class="panel-head">
-          <h3>本机节点</h3>
+      <section v-if="canManageLocalNodes" id="section-local-nodes" class="node-section">
+        <div class="section-head">
+          <h2>
+            本机节点<span class="pill">{{ localNodeList.length }}</span>
+          </h2>
           <button class="quiet-button small" @click="localNodeDialog?.openCreate()">+ 新建本机节点</button>
         </div>
         <p class="hint">
-          本机节点和 Hub
-          同进程运行，各自声明承担的能力（例如一个只做转写，一个只做整理）。所有本机节点与外部连接共享显存，一次只执行一个阶段。
+          与 Hub 同进程运行，可各自承担一部分能力。所有本机节点共享显存，一次只执行一个阶段。
         </p>
         <div class="worker-list">
-          <article v-for="node in localNodeList" :key="node.id" class="local-node-card">
+          <article v-for="node in localNodeList" :key="node.id" class="node-card local-node-card">
             <div class="worker-head">
-              <span class="online" :class="localNodeStatus(node)"></span>
-              <button type="button" class="node-link" @click="selected = { kind: 'local', id: node.id }">
-                {{ node.name || node.id }}
-              </button>
-              <span v-if="node.builtin" class="pill">内置</span>
-              <span class="muted">{{
-                !node.enabled ? "已停用" : node.busy ? "执行中" : node.online ? "在线" : "离线"
-              }}</span>
+              <span class="node-icon kind-local" aria-hidden="true"></span>
+              <div class="node-name">
+                <div class="node-title">
+                  <button type="button" class="node-link" @click="selected = { kind: 'local', id: node.id }">
+                    {{ node.name || node.id }}
+                  </button>
+                  <span v-if="node.builtin" class="pill">内置</span>
+                </div>
+                <small class="node-meta"
+                  >{{ node.auto ? "能力自动跟随本机检测" : "能力为手动选择" }} · {{ node.id }}</small
+                >
+              </div>
+              <span class="status-chip"
+                ><span class="online" :class="localNodeStatus(node)"></span
+                >{{ !node.enabled ? "已停用" : node.busy ? "执行中" : node.online ? "在线" : "离线" }}</span
+              >
               <div class="worker-actions">
                 <button
                   class="quiet-button small"
@@ -695,29 +704,23 @@ async function copy(text: string): Promise<void> {
                 </button>
               </div>
             </div>
-            <div class="capabilities">
-              <span v-for="capability in node.capabilities" :key="capability" class="tag">{{
-                label(capability)
-              }}</span>
-              <span v-if="!node.capabilities?.length" class="muted">没有可承担的能力</span>
-            </div>
-            <small class="muted"
-              >{{ node.auto ? "能力自动跟随本机检测" : "能力为手动选择" }} · {{ node.id }}</small
-            >
+            <CapabilityTags :capabilities="node.capabilities" empty="没有可承担的能力" />
           </article>
         </div>
       </section>
 
-      <section v-if="canManageLinks" id="section-external-hubs" class="panel">
-        <div class="panel-head">
-          <h3>连出到外部 Hub</h3>
+      <section v-if="canManageLinks" id="section-external-hubs" class="node-section">
+        <div class="section-head">
+          <h2>
+            外部 Hub<span class="pill">{{ outgoingLinks.length }}</span>
+          </h2>
           <button class="quiet-button small" @click="showAddHub = !showAddHub">
             {{ showAddHub ? "收起" : "+ 连接新 Hub" }}
           </button>
         </div>
         <p class="hint">
-          检测到 <code>.env</code> 中配置了 <code>COURSE2MD_HUB_URL</code> 与
-          <code>COURSE2MD_WORKER_TOKEN</code> 时，启动本地服务会自动连入；也可以在这里同时连接多个外部 Hub。
+          本机作为计算节点连入的其它 Hub。在 <code>.env</code> 中配置 <code>COURSE2MD_HUB_URL</code> 与
+          <code>COURSE2MD_WORKER_TOKEN</code> 后，启动本地服务会自动连入。
         </p>
 
         <div v-if="outgoingLinks.length" class="worker-list">
@@ -725,19 +728,31 @@ async function copy(text: string): Promise<void> {
             v-for="link in outgoingLinks"
             :id="`link-${link.id}`"
             :key="link.id"
-            class="worker-card hub-link-card"
+            class="node-card worker-card hub-link-card"
           >
             <div class="worker-head">
-              <span class="online" :class="linkDotClass(link.status)"></span>
-              <a
-                class="hub-link-url"
-                :href="`${link.hub_url}/workers`"
-                target="_blank"
-                rel="noopener noreferrer"
-                >{{ hubHost(link.hub_url) }}</a
+              <span class="node-icon kind-external" aria-hidden="true"></span>
+              <div class="node-name">
+                <div class="node-title">
+                  <a
+                    class="hub-link-url"
+                    :href="`${link.hub_url}/workers`"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >{{ hubHost(link.hub_url) }}</a
+                  >
+                  <span class="pill">{{ link.source === "env" ? "来自 .env" : "手动添加" }}</span>
+                </div>
+                <small class="node-meta"
+                  >{{ link.name }}{{ link.worker_id ? ` · ${link.worker_id}` : ""
+                  }}{{ link.token_hint ? ` · 令牌 ${link.token_hint}` : ""
+                  }}{{ link.auto_connect ? " · 启动自动连" : "" }}</small
+                >
+              </div>
+              <span class="status-chip"
+                ><span class="online" :class="linkDotClass(link.status)"></span
+                >{{ linkStatusLabels[link.status ?? "disconnected"] ?? link.status }}</span
               >
-              <span class="pill">{{ link.source === "env" ? "来自 .env" : "外部 Hub" }}</span>
-              <span class="muted">{{ linkStatusLabels[link.status ?? "disconnected"] ?? link.status }}</span>
               <div class="worker-actions">
                 <button
                   v-if="link.status === 'disconnected' || link.status === 'auth_failed'"
@@ -776,20 +791,7 @@ async function copy(text: string): Promise<void> {
               {{ link.last_error }}
             </div>
 
-            <div class="capabilities">
-              <span v-for="capability in link.capabilities ?? []" :key="capability" class="tag">{{
-                label(capability)
-              }}</span>
-            </div>
-
-            <small class="muted">
-              {{ link.name }}
-              {{ link.worker_id ? ` · ${link.worker_id}` : "" }}
-              {{ link.token_hint ? ` · 令牌 ${link.token_hint}` : "" }}
-              {{ link.last_heartbeat ? ` · 最近心跳 ${dateTime(link.last_heartbeat)}` : "" }}
-              {{ link.completed_tasks ? ` · 已完成 ${link.completed_tasks} 次` : "" }}
-              {{ link.auto_connect ? " · 启动自动连" : "" }}
-            </small>
+            <CapabilityTags :capabilities="link.capabilities" />
 
             <div v-if="editingId === link.id" class="hub-edit-box">
               <div class="hub-form-grid">
@@ -858,7 +860,7 @@ async function copy(text: string): Promise<void> {
           </article>
         </div>
 
-        <p v-else-if="!showAddHub" class="muted">
+        <p v-else-if="!showAddHub" class="node-empty">
           尚未连接到外部 Hub。点击右上角「+ 连接新 Hub」，或在 <code>.env</code> 配置后重启即可自动连入。
         </p>
 
@@ -912,9 +914,14 @@ async function copy(text: string): Promise<void> {
         </form>
       </section>
 
-      <section class="panel">
-        <h3>{{ canManageLinks ? "连入本机的节点" : "节点" }}</h3>
-        <p v-if="!incomingWorkers.length" class="muted empty-hint">
+      <section class="node-section">
+        <div class="section-head">
+          <h2>
+            {{ canManageLinks ? "连入本机的节点" : "节点"
+            }}<span class="pill">{{ incomingWorkers.length }}</span>
+          </h2>
+        </div>
+        <p v-if="!incomingWorkers.length" class="node-empty">
           {{
             session.mode === "server"
               ? "当前服务器以纯 Hub 模式运行，尚未连接任何计算节点。请在下方生成令牌，并在装有显卡或解析插件的电脑上通过本地网页「计算服务 → 连出到外部 Hub」或 course2md worker 接入。"
@@ -922,14 +929,29 @@ async function copy(text: string): Promise<void> {
           }}
         </p>
         <div v-else class="worker-list">
-          <article v-for="worker in incomingWorkers" :key="worker.id" class="worker-card">
+          <article v-for="worker in incomingWorkers" :key="worker.id" class="node-card worker-card">
             <div class="worker-head">
-              <span class="online" :class="{ on: worker.online }"></span>
-              <strong>{{ worker.name || worker.id }}</strong>
-              <span class="pill">{{
-                worker.kind === "builtin" ? "内置" : worker.owner_id ? "个人节点" : "共享节点"
-              }}</span>
-              <span class="muted">{{ worker.online ? "在线" : worker.disabled ? "已停用" : "离线" }}</span>
+              <span
+                class="node-icon"
+                :class="worker.kind === 'builtin' ? 'kind-local' : 'kind-remote'"
+                aria-hidden="true"
+              ></span>
+              <div class="node-name">
+                <div class="node-title">
+                  <strong>{{ worker.name || worker.id }}</strong>
+                  <span class="pill">{{
+                    worker.kind === "builtin" ? "内置" : worker.owner_id ? "个人节点" : "共享节点"
+                  }}</span>
+                </div>
+                <small class="node-meta"
+                  >{{ worker.id }}{{ worker.version ? ` · ${worker.version}` : ""
+                  }}{{ worker.last_seen ? ` · 最近在线 ${dateTime(worker.last_seen)}` : "" }}</small
+                >
+              </div>
+              <span class="status-chip"
+                ><span class="online" :class="{ on: worker.online }"></span
+                >{{ worker.online ? "在线" : worker.disabled ? "已停用" : "离线" }}</span
+              >
               <div v-if="canManage(worker)" class="worker-actions">
                 <button
                   v-if="!worker.disabled"
@@ -948,46 +970,41 @@ async function copy(text: string): Promise<void> {
                 </button>
               </div>
             </div>
-            <div class="capabilities">
-              <span v-for="capability in worker.capabilities" :key="capability" class="tag">{{
-                label(capability)
-              }}</span>
-              <span v-if="!worker.capabilities?.length" class="muted">尚未连接</span>
-            </div>
-            <small class="muted"
-              >{{ worker.id }}{{ worker.version ? ` · ${worker.version}` : ""
-              }}{{ worker.last_seen ? ` · 最近在线 ${dateTime(worker.last_seen)}` : "" }}</small
-            >
+            <CapabilityTags :capabilities="worker.capabilities" empty="尚未连接" />
           </article>
         </div>
       </section>
 
-      <section id="section-add-node" class="panel">
-        <h3>{{ canManageLinks ? "允许其它节点连入本机" : "添加节点" }}</h3>
-        <div class="inline-form">
-          <label class="field compact"
-            ><span>节点名称</span><input v-model="name" placeholder="例如：我的电脑"
-          /></label>
-          <label v-if="isAdmin() && session.mode === 'server'" class="check-inline">
-            <input v-model="personal" type="checkbox" /> 只处理我自己的任务
-          </label>
-          <button class="primary-button" @click="create">生成令牌</button>
+      <section id="section-add-node" class="node-section">
+        <div class="section-head">
+          <h2>{{ canManageLinks ? "允许其它节点连入本机" : "添加节点" }}</h2>
         </div>
-        <div v-if="created" class="token-box">
-          <p>
-            「{{ created.name }}」的令牌只显示这一次（{{
-              created.shared ? "共享节点，可处理所有人的任务" : "个人节点"
-            }}）：
-          </p>
-          <code class="copyable" @click="copy(created.token)">{{ created.token }}</code>
-          <p>在另一台电脑运行，或直接复制下一行粘贴到对方网页「计算服务 → 连出到外部 Hub」：</p>
-          <pre class="copyable" @click="copy(`course2md worker --hub ${hubUrl} --token ${created.token}`)">
+        <div class="add-node-card">
+          <div class="inline-form">
+            <label class="field compact"
+              ><span>节点名称</span><input v-model="name" placeholder="例如：我的电脑"
+            /></label>
+            <label v-if="isAdmin() && session.mode === 'server'" class="check-inline">
+              <input v-model="personal" type="checkbox" /> 只处理我自己的任务
+            </label>
+            <button class="primary-button" @click="create">生成令牌</button>
+          </div>
+          <div v-if="created" class="token-box">
+            <p>
+              「{{ created.name }}」的令牌只显示这一次（{{
+                created.shared ? "共享节点，可处理所有人的任务" : "个人节点"
+              }}）：
+            </p>
+            <code class="copyable" @click="copy(created.token)">{{ created.token }}</code>
+            <p>在另一台电脑运行，或直接复制下一行粘贴到对方网页「计算服务 → 连出到外部 Hub」：</p>
+            <pre class="copyable" @click="copy(`course2md worker --hub ${hubUrl} --token ${created.token}`)">
 uv tool install "course2md[asr,cuda]"
 course2md worker --hub {{ hubUrl }} --token {{ created.token }}</pre>
-          <p class="hint">
-            没有 NVIDIA 显卡时去掉 cuda；只想承担整理任务可加 --without
-            asr。局域网节点连接本地应用时，本地应用需用 --host 0.0.0.0 启动。
-          </p>
+            <p class="hint">
+              没有 NVIDIA 显卡时去掉 cuda；只想承担整理任务可加 --without
+              asr。局域网节点连接本地应用时，本地应用需用 --host 0.0.0.0 启动。
+            </p>
+          </div>
         </div>
       </section>
     </div>

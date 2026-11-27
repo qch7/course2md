@@ -8,7 +8,15 @@ import { ui } from "@/stores/ui";
 
 import WorkersView from "./WorkersView.vue";
 
-const available = ["asr", "frames", "frame-selector:general", "hub", "llm-api"];
+const available = [
+  "asr",
+  "frames",
+  "frame-selector:general",
+  "hub",
+  "llm-api",
+  "resolver:hdu",
+  "resolver:hdu@0.1.0",
+];
 
 function worker(overrides: Partial<Worker>): Worker {
   return {
@@ -294,6 +302,22 @@ describe("mesh topology and local nodes", () => {
     expect(text).toContain("执行中");
     expect(text).toContain("3 / 1 次");
     expect(text).toContain("连接日志（1）");
+  });
+
+  it("lists a resolver and its versioned declaration as a single choice", async () => {
+    await render();
+    await wrapper.find(".mesh-vertex.kind-local.status-add").trigger("click");
+    const dialog = wrapper.find(".local-node-dialog");
+    const labels = dialog.findAll(".check-row label").map((label) => label.text());
+    expect(labels.filter((text) => text.includes("hdu"))).toEqual(["来源：hdu v0.1.0"]);
+    for (const box of dialog.findAll(".check-row input[type=checkbox]")) {
+      await box.setValue(box.element.parentElement!.textContent!.includes("hdu"));
+    }
+    await dialog.find("form").trigger("submit");
+    await flushPromises();
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/local-nodes", {
+      body: expect.objectContaining({ capabilities: ["resolver:hdu", "resolver:hdu@0.1.0"] }),
+    });
   });
 
   it("creates a local node with a chosen subset of capabilities", async () => {
