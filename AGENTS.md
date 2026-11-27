@@ -97,7 +97,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
 - **语言**：注释、文档字符串、界面文字、错误消息和文档都用中文；标识符用英文。
 - **注释写“为什么”**：说明约束、实测结论和取舍，不复述代码在做什么。
 - **类型**：新代码完整标注类型（`core`、`stages`、`config`、`util`、`storage`、`jobs` 已由 mypy 强制要求，见 `pyproject.toml` 的 overrides；其它包改动时顺手补齐后再登记）；不要用 `Any` 掩盖结构，跨模块传递的数据用 dataclass、TypedDict 或 pydantic 模型。`# type: ignore` 必须带错误码，并说明原因。
-- **函数规模**：ruff 的 `PLR0915`（语句数）与 `PLR0912`（分支数）保持开启。已有的长函数带有 `# noqa: PLR0915  历史遗留的长函数，拆分后移除` 标记；新代码不要新增这类标记，拆分旧函数时顺手删掉对应标记。
+- **函数规模**：ruff 的 `PLR0915`（语句数，上限 50）与 `PLR0912`（分支数，上限 12）保持开启，目前没有任何豁免。函数超限时拆成带名字的私有辅助函数，不要加 `noqa`。
 - **跨模块访问任务管理器**：`hub`、`jobs/bundle` 等模块只用 `JobManager` 的公开方法（`locked()`、`save_job()`、`record_version()`、`shared()`）和 `Job.locked()`，不要访问 `_lock`、`_save` 等私有成员。锁顺序固定为先管理器锁、后任务锁。
 - **平台判断**：用 `sys.platform == "win32"`，mypy 能据此在各平台收窄类型。子进程使用 `util/proc.py` 的 `NO_WINDOW` 和 `kill_tree`。
 - **路径**：使用 `pathlib.Path`；写文件显式指定 `encoding="utf-8"`；覆盖写入时先写临时文件，再原子替换。
