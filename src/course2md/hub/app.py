@@ -17,10 +17,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .. import __version__
 from ..core.accounts import AccountError
 from ..resolvers import ResolverError
+from .access import Forbidden, NotFound
 from .api import v1_router, worker_router
 from .auth import router as auth_router
 from .security import LocalOriginGuard
-from .service import Forbidden, NotFound
 from .transfer import TransferError
 
 DEFAULT_PORT = 8765

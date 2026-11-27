@@ -15,7 +15,7 @@ from course2md.agents.api import AgentConfig, AgentError, AgentPreset, AgentRequ
 from course2md.errors import Course2mdError, rebuild_error
 from course2md.plugins import PluginRegistry
 from course2md.stages.base import BaseStage
-from course2md.stages.codec import cache_key, output_model, requires_for
+from course2md.stages.dispatch import cache_key, output_model, requires_for
 from course2md.stages.options import JobOptions
 from course2md.stages.registry import PIPELINE_STAGES, STAGE_LABELS, STAGE_TYPES
 

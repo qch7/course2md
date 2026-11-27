@@ -12,7 +12,8 @@ from ...jobs.job import ACTIVE_STATUSES, Job
 from ...jobs.manager import JobManager
 from ...jobs.records import CourseRecord
 from ...util.text import safe_name
-from .common import NotFound, get_course, get_job, output_root, server_mode, visible
+from ..access import NotFound, server_mode
+from .common import get_course, get_job, output_root, visible
 
 
 def _peer_store(manager: JobManager):

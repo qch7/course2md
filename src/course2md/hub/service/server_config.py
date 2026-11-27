@@ -25,7 +25,8 @@ from ...jobs.manager import JobManager
 from ...resolvers import (
     available,
 )
-from .common import has_local_node, server_mode
+from ..access import server_mode
+from .common import has_local_node
 
 
 def _node_capabilities(manager: JobManager, user: User) -> list[tuple[str, set[str]]]:

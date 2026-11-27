@@ -78,7 +78,8 @@ def test_artifact_kind_and_version_are_checked():
 
 def test_frame_selector_survives_queue_serialization_and_changes_cache_keys(tmp_path):
     from course2md.stages.artifacts import OrganizeInput
-    from course2md.stages.codec import cache_key, options_from_dict, options_to_dict, requires_for
+    from course2md.stages.codec import options_from_dict, options_to_dict
+    from course2md.stages.dispatch import cache_key, requires_for
 
     legacy = options_to_dict(JobOptions("local", tmp_path))
     legacy.pop("frame_selector")

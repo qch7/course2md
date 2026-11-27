@@ -18,7 +18,9 @@ from ...stages.codec import decode, options_to_dict
 from ...stages.executor import rebuild_task_error
 from ...stages.options import JobOptions
 from ...stages.sessions import SessionsStage
-from .common import Forbidden, get_course, has_local_node, output_root, server_mode, visible
+from ..access import Forbidden, server_mode
+from ..plugins import ensure_ready
+from .common import get_course, has_local_node, output_root, visible
 
 
 def check_source(manager: JobManager, user: User, resolver_name: str) -> None:
@@ -111,8 +113,6 @@ def stored_sessions(manager: JobManager, body: dict, source: str, user: User, wa
 
 
 def resolve_source(manager: JobManager, body: dict, user: User = LOCAL_USER) -> dict:
-    from ..plugins import ensure_ready
-
     ensure_ready()
     source = (body.get("source") or "").strip()
     if not source:

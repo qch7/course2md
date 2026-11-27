@@ -17,7 +17,8 @@ from markdown_it import MarkdownIt
 from ..errors import rebuild_error
 from .artifacts import FrameSet, Notes, TranscriptFiles
 from .base import Cancelled, Stage, StageContext
-from .codec import cache_key, decode, encode, options_to_dict, requires_for
+from .codec import decode, encode, options_to_dict
+from .dispatch import cache_key, requires_for
 from .registry import STAGE_LABELS, stage_label, stage_type
 
 if TYPE_CHECKING:

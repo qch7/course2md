@@ -20,7 +20,7 @@ from ..core.accounts import LOCAL_USER, User
 from ..resolvers import available, load_errors
 from ..resolvers.registry import ENTRY_POINT_GROUP
 from ..util.proc import NO_WINDOW
-from .service import Forbidden, NotFound, server_mode
+from .access import Forbidden, NotFound, server_mode
 
 MAX_UPLOAD_BYTES = 32 * 1024 * 1024
 ARCHIVE_SUFFIXES = (".whl", ".zip", ".tar.gz")

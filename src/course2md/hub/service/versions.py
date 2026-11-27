@@ -5,7 +5,8 @@ from __future__ import annotations
 from ...core.accounts import LOCAL_USER, User
 from ...jobs.job import ACTIVE_STATUSES
 from ...jobs.manager import JobManager
-from .common import NotFound, get_job
+from ..access import NotFound
+from .common import get_job
 
 
 def _versions(manager: JobManager):
