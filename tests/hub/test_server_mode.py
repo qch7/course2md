@@ -3,59 +3,13 @@
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from course2md.core.accounts import Accounts, hash_password, verify_password
+from course2md.core.accounts import hash_password, verify_password
 from course2md.core.models import CourseRow, JobRow, TaskRow
-from course2md.hub import auth
-from course2md.hub.app import create_app
-from course2md.jobs import manager as server
-from resolver_patch import patch_get_resolver
-
-SECRET_SOURCE = "https://classroom.example/play?token=very-secret"
-
-
-@pytest.fixture
-def hub(tmp_path, monkeypatch):
-
-    monkeypatch.setenv("COURSE2MD_SECRET_KEY", "test-secret-key")
-    monkeypatch.setenv("COURSE2MD_OUT_DIR", str(tmp_path / "data"))
-    monkeypatch.setattr("course2md.agents.dsh.dsh_prefix", list)
-    monkeypatch.setattr("course2md.agents.codex.codex_prefix", list)
-    patch_get_resolver(
-        monkeypatch,
-        lambda source: SimpleNamespace(
-            name="local" if source.endswith(".mp4") else "fakeclass", list_sessions=lambda source: []
-        ),
-    )
-    monkeypatch.setattr(auth, "_failures", auth.defaultdict(auth.deque))
-    manager = server.JobManager(tmp_path / "data" / ".course2md" / "workspace.sqlite3", builtin_worker=False)
-    accounts = Accounts(manager.store.db, registration="closed")
-    app = create_app(manager, accounts=accounts)
-
-    def client():
-        return TestClient(app, base_url="https://course.example.com")
-
-    yield SimpleNamespace(manager=manager, accounts=accounts, client=client, data=tmp_path / "data")
-    manager.close()
-
-
-def _register(client, username, password="password-123"):
-    """创建首个管理员：与真实部署一样，凭启动时生成的初始化令牌。"""
-    token = client.app.state.accounts.begin_setup()
-    response = client.post(
-        "/api/v1/auth/setup", json={"username": username, "password": password, "setup_token": token}
-    )
-    assert response.status_code == 200, response.text
-    return response.json()["user"]
-
-
-def _job(client, **extra):
-    return client.post("/api/v1/jobs", json={"source": SECRET_SOURCE, "agent": "none", **extra})
+from server_helpers import SECRET_SOURCE, job_request, register_first_admin
 
 
 def test_password_hashes_are_salted():
@@ -97,7 +51,7 @@ def test_setup_attempts_are_throttled(hub):
 
 def test_admin_manages_roles_and_resets_passwords(hub):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     alice_id = admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"}).json()["user"]["id"]
     teacher_id = admin.get("/api/v1/auth/me").json()["user"]["id"]
     alice = hub.client()
@@ -132,7 +86,7 @@ def test_first_user_becomes_admin_and_registration_is_closed(hub):
     }
     assert anonymous.get("/api/v1/jobs").status_code == 401
     admin = hub.client()
-    assert _register(admin, "teacher")["role"] == "admin"
+    assert register_first_admin(admin, "teacher")["role"] == "admin"
     assert admin.get("/api/v1/auth/me").json()["user"]["username"] == "teacher"
     response = hub.client().post("/api/v1/auth/register", json={"username": "student", "password": "password-123"})
     assert response.status_code == 400 and "未开放注册" in response.json()["error"]
@@ -162,14 +116,14 @@ def test_bearer_tokens_and_cookies_are_secure(hub):
 
 def test_users_only_see_their_own_courses_and_jobs(hub):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"})
     admin.post("/api/v1/users", json={"username": "bob", "password": "password-123"})
     alice, bob = hub.client(), hub.client()
     alice.post("/api/v1/auth/login", json={"username": "alice", "password": "password-123"})
     bob.post("/api/v1/auth/login", json={"username": "bob", "password": "password-123"})
 
-    response = _job(alice, out_dir="C:/Windows")
+    response = job_request(alice, out_dir="C:/Windows")
     assert response.status_code == 200, response.text
     job = response.json()["job"]
     alice_id = alice.get("/api/v1/auth/me").json()["user"]["id"]
@@ -187,28 +141,28 @@ def test_users_only_see_their_own_courses_and_jobs(hub):
         assert bob.get(path).status_code == 404, path
     assert bob.post(f"/api/v1/jobs/{job['id']}/cancel", json={}).status_code == 404
     assert bob.post(f"/api/v1/jobs/{job['id']}/messages", json={"text": "hi"}).status_code == 404
-    response = _job(bob, course_id=job["course_id"])
+    response = job_request(bob, course_id=job["course_id"])
     assert response.status_code == 404
 
 
 def test_server_restrictions_for_regular_users(hub):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"})
     alice = hub.client()
     alice.post("/api/v1/auth/login", json={"username": "alice", "password": "password-123"})
     response = alice.post("/api/v1/jobs", json={"source": "D:/secret/lecture.mp4"})
     assert response.status_code == 403 and "本地文件" in response.json()["error"]
-    assert _job(alice, agent="powershell -c whoami").status_code == 403
-    assert _job(alice, llm_base="https://attacker.example/v1").status_code == 403
+    assert job_request(alice, agent="powershell -c whoami").status_code == 403
+    assert job_request(alice, llm_base="https://attacker.example/v1").status_code == 403
     config = alice.get("/api/v1/config").json()
     assert config["server"] and not config.get("default_out") and "model_path" not in config
 
 
 def test_sources_are_encrypted_at_rest(hub):
     client = hub.client()
-    _register(client, "teacher")
-    job = _job(client).json()["job"]
+    register_first_admin(client, "teacher")
+    job = job_request(client).json()["job"]
     with hub.manager.store.db.session() as session:
         stored = [row.data for row in session.scalars(select(CourseRow))] + [
             row.data for row in session.scalars(select(JobRow))
@@ -237,7 +191,7 @@ def test_personal_nodes_only_claim_their_owners_tasks(hub):
 @pytest.mark.parametrize("permanent", [False, True])
 def test_node_tokens_are_scoped_to_users(hub, permanent):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"})
     alice = hub.client()
     alice.post("/api/v1/auth/login", json={"username": "alice", "password": "password-123"})
@@ -259,7 +213,7 @@ def test_node_tokens_are_scoped_to_users(hub, permanent):
 @pytest.mark.parametrize("disabled", [False, True])
 def test_worker_deletion_removes_record_and_revokes_token(hub, disabled):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     worker = admin.post("/api/v1/workers", json={"name": "旧电脑"}).json()
     path = f"/api/v1/workers/{worker['worker_id']}"
     if disabled:
@@ -278,7 +232,7 @@ def test_worker_deletion_removes_record_and_revokes_token(hub, disabled):
 @pytest.mark.parametrize("leased", [False, True])
 def test_worker_deletion_protects_unfinished_tasks(hub, leased):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     worker = admin.post("/api/v1/workers", json={"name": "工作电脑"}).json()
     worker_id = worker["worker_id"]
     queue = hub.manager.queue
@@ -299,7 +253,7 @@ def test_worker_deletion_protects_unfinished_tasks(hub, leased):
 
 def test_only_admin_can_delete_another_users_node_and_builtin_is_protected(hub):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"})
     admin.post("/api/v1/users", json={"username": "bob", "password": "password-123"})
     alice, bob = hub.client(), hub.client()
@@ -318,7 +272,7 @@ def test_only_admin_can_delete_another_users_node_and_builtin_is_protected(hub):
 
 def test_disabled_users_lose_sessions_and_failed_logins_are_throttled(hub):
     admin = hub.client()
-    _register(admin, "teacher")
+    register_first_admin(admin, "teacher")
     alice_id = admin.post("/api/v1/users", json={"username": "alice", "password": "password-123"}).json()["user"]["id"]
     alice = hub.client()
     alice.post("/api/v1/auth/login", json={"username": "alice", "password": "password-123"})
