@@ -43,7 +43,11 @@ T = TypeVar("T")
 
 
 class JobManager:
-    """不同课次并行编排，同一课次的提取与对话保持顺序。"""
+    """不同课次并行编排，同一课次的提取与对话保持顺序。
+
+    这里的队列是“作业层”：按课次排队。阶段怎样分配给节点由 ``core.queue.TaskQueue`` 负责，
+    两层的分工见 docs/architecture.md 的“两层调度”。
+    """
 
     def __init__(
         self,
