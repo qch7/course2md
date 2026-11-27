@@ -208,7 +208,7 @@ def test_chat_client_retries_on_truncation(monkeypatch):
 
 
 def test_select_changes_filters_short_gaps():
-    from course2md.asr.frames import select_changes
+    from course2md.frames.sampling import select_changes
 
     stamps = [0, 5, 10, 15, 20, 25, 30]
     diffs = [0, 9, 0, 50, 0, 0]
@@ -217,7 +217,7 @@ def test_select_changes_filters_short_gaps():
 
 
 def test_select_changes_respects_max_frames():
-    from course2md.asr.frames import select_changes
+    from course2md.frames.sampling import select_changes
 
     stamps = list(range(0, 200, 5))
     diffs = [50.0] * (len(stamps) - 1)
@@ -232,7 +232,7 @@ def test_select_changes_respects_max_frames():
 
 
 def test_frame_index_written(tmp_path):
-    from course2md.asr.frames import Frame, write_index
+    from course2md.frames.sampling import Frame, write_index
 
     frames = [Frame(226, tmp_path / "00-03-46.jpg"), Frame(690, tmp_path / "00-11-30.jpg")]
     path = write_index(frames, tmp_path / "index.md")

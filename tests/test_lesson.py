@@ -11,10 +11,11 @@ import pytest
 
 from course2md.agents import AgentConfig
 from course2md.asr.formats import Segment
-from course2md.asr.frames import Frame
 from course2md.config import LlmConfig
-from course2md.refine import lesson, visuals
+from course2md.frames.sampling import Frame
+from course2md.refine import lesson
 from course2md.refine.llm import LlmError
+from course2md.refine.vision import visuals
 
 
 @pytest.fixture

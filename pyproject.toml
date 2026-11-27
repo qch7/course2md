@@ -133,9 +133,18 @@ quote-style = "double"
 python_version = "3.10"
 mypy_path = "src"
 packages = ["course2md"]
-ignore_missing_imports = true
+# 不全局忽略缺失的导入：否则包内模块改名后拼错的导入也不会报错
+ignore_missing_imports = false
 check_untyped_defs = true
 warn_unused_ignores = true
+
+# 这些第三方库没有类型信息，或只在特定 Python 版本/可选依赖下存在
+[[tool.mypy.overrides]]
+module = [
+    "faster_whisper", "faster_whisper.*", "ctranslate2", "jsonschema", "jsonschema.*", "tomli", "tomllib",
+    "psycopg", "psycopg.*", "cryptography", "cryptography.*", "av", "cv2", "onnxruntime",
+]
+ignore_missing_imports = true
 
 # 分层约束：上层可以导入下层，反之不行；同一层用 | 分隔的模块彼此独立。
 # 运行：uv run lint-imports
@@ -155,7 +164,7 @@ layers = [
     "course2md.stages",
     "course2md.export | course2md.doctor",
     "course2md.refine",
-    "course2md.asr",
+    "course2md.asr | course2md.frames",
     "course2md.config",
     "course2md.agents | course2md.resolvers | course2md.frame_selectors | course2md.core",
     "course2md.plugins | course2md.storage | course2md.util | course2md.errors",

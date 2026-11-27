@@ -11,7 +11,7 @@ from sqlalchemy import update
 from course2md.core import Database, LeaseLost, TaskQueue
 from course2md.core.db import IncompatibleDatabase
 from course2md.core.models import ArtifactRow, TaskRow, WorkerRow
-from course2md.jobs.storage import WorkspaceStore
+from course2md.jobs.workspace_store import WorkspaceStore
 from course2md.storage import LocalFileStore, canonical_json, digest_bytes
 
 

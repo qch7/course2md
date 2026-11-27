@@ -8,8 +8,8 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-from course2md.asr.frames import _sample, extract, select_changes
 from course2md.config import bootstrap_runtime
+from course2md.frames.sampling import _sample, extract, select_changes
 
 
 @pytest.fixture
@@ -89,7 +89,7 @@ def test_general_full_scan_keeps_changes_in_plain_frames(video, tmp_path):
 
 
 def test_installed_selector_runs_on_video_and_saved_screenshots(video, tmp_path, monkeypatch):
-    from course2md.asr.selection import select_frames
+    from course2md.frames.selection import select_frames
     from course2md.worker.capabilities import detect_capabilities
 
     dist = tmp_path / "course2md_demo-0.1.dist-info"
@@ -141,7 +141,7 @@ def test_subsecond_screenshots_have_unique_paths(slides_video, tmp_path):
 
 
 def test_coverage_mode_rejects_screenshot_save_failures(slides_video, tmp_path, monkeypatch):
-    from course2md.asr import frames
+    from course2md.frames import sampling as frames
 
     def fail(*args):
         raise OSError("disk unavailable")
@@ -218,7 +218,7 @@ def test_sample_aligns_delayed_video_to_audio_origin(tmp_path):
 @pytest.mark.parametrize("interval,strict", [(0.3, True), (1.0, True), (2.35, False), (0.5, False)])
 def test_sequential_scan_matches_per_target_seeking(video, monkeypatch, interval, strict):
     """顺序解码与逐点定位取到的帧时间和画面一致。"""
-    from course2md.asr import frames as frames_module
+    from course2md.frames import sampling as frames_module
 
     sequential = [(ts, frame.to_ndarray().mean()) for ts, frame in _sample(video, interval, strict=strict)]
     monkeypatch.setattr(frames_module, "SEEK_MIN_GAP", 0.0)
@@ -228,7 +228,7 @@ def test_sequential_scan_matches_per_target_seeking(video, monkeypatch, interval
 
 
 def test_explicit_timestamps_use_same_frames_either_way(video, monkeypatch):
-    from course2md.asr import frames as frames_module
+    from course2md.frames import sampling as frames_module
 
     wanted = [0.0, 3.3, 7.05, 11.9]
     dense = [ts for ts, _frame in _sample(video, 1.0, wanted, strict=True)]

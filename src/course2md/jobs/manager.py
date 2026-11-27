@@ -39,7 +39,7 @@ from ..stages.executor import QueueExecutor, Suspended
 from ..stages.options import JobOptions
 from ..storage import LocalFileStore
 from ..util.text import safe_name
-from .storage import WorkspaceStore
+from .workspace_store import WorkspaceStore
 
 if TYPE_CHECKING:
     from ..worker import LocalNodeManager, WorkerRunner

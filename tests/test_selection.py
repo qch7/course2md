@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from course2md.asr.frames import Frame, extract
-from course2md.asr.selection import ContentSelector, select_frames
 from course2md.config import bootstrap_runtime
+from course2md.frames.sampling import Frame, extract
+from course2md.frames.selection import ContentSelector, select_frames
 
 
 def classroom(text="S -> a", *, extra=False, clock=0, teacher=False):

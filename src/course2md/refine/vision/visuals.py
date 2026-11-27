@@ -19,10 +19,10 @@ from typing import Any
 
 from jsonschema import ValidationError, validate
 
-from ..agents import AgentConfig, AgentError, AgentOutput, execute_agent
-from ..asr.frames import Frame
-from ..config import LlmConfig
-from .llm import ChatClient, LlmError, parse_json_reply
+from ...agents import AgentConfig, AgentError, AgentOutput, execute_agent
+from ...config import LlmConfig
+from ...frames.sampling import Frame
+from ..llm import ChatClient, LlmError, parse_json_reply
 from .screening import (
     DUPLICATE,
     READ,

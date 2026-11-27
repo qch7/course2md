@@ -1,7 +1,7 @@
 """两段式读图的第一段：把缩略图拼成带编号的总览图，让模型挑出值得细读的画面。
 
 总览图只用于筛选：每格分辨率低，看得出“是课件还是人像、和哪张是同一页”，看不清细节。
-入选画面再按原图分辨率逐批细读（见 :func:`course2md.refine.visuals.read_visuals`）。
+入选画面再按原图分辨率逐批细读（见 :func:`course2md.refine.vision.visuals.read_visuals`）。
 
 模型拿不准时应选 read；没有返回结论、结论无效或引用了不存在的画面时，一律按 read 处理，
 所以初筛只会少读，不会让有内容的画面在没有依据的情况下被丢掉。
@@ -14,7 +14,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from ..asr.frames import Frame
+from ...frames.sampling import Frame
 
 # 每格 480×270 加编号条，4 列 3 行拼成约 1920×900 的总览图，接近视觉接口的单图上限
 TILE_SIZE = (480, 270)

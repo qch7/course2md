@@ -28,7 +28,7 @@ def test_frames_redownload_missing_media_without_transcribing(tmp_path, monkeypa
         return []
 
     monkeypatch.setattr(frames, "download", download)
-    monkeypatch.setattr("course2md.asr.frames.extract", extract)
+    monkeypatch.setattr("course2md.frames.sampling.extract", extract)
     result = FramesStage().run(StageContext(JobOptions("fake://course", tmp_path)), [transcript])
     assert result[0].stem == "course"
     assert transcript.segments[0].text == "已有转写"

@@ -260,7 +260,7 @@ def cmd_list(args) -> int:
 def cmd_refine(args) -> int:
     from .agents import AgentError, preset_names
     from .asr.formats import load_segments
-    from .asr.frames import extract
+    from .frames.sampling import extract
     from .refine import LlmError
     from .refine.lesson import build_note_pair, focus_timestamps, save_note_pair
     from .util.text import ensure_dir
@@ -415,7 +415,7 @@ def cmd_worker(args) -> int:
 
 def cmd_worker_token(args) -> int:
     from .core.queue import TaskQueue
-    from .jobs.storage import WorkspaceStore
+    from .jobs.workspace_store import WorkspaceStore
     from .storage import LocalFileStore
 
     store = WorkspaceStore(

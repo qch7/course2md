@@ -131,7 +131,7 @@ def test_unknown_format_fails_before_any_work(tmp_path, monkeypatch):
 def chat_workspace(tmp_path):
     from unittest.mock import Mock
 
-    from course2md.asr.frames import Frame
+    from course2md.frames.sampling import Frame
     from course2md.refine import lesson
 
     image = tmp_path / "画面.jpg"

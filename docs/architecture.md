@@ -44,7 +44,8 @@ Anki 导出使用课程工作区中的结构化记录；Obsidian 同步只复制
 | `src/course2md/hub/` | FastAPI 应用、`/api/v1` 路由、节点接口、登录、请求与响应模型、业务逻辑 |
 | `src/course2md/jobs/` | 任务管理（课程与任务记录、按课次执行、重启恢复、课程对话） |
 | `src/course2md/export.py` | Anki 导出与保留本地修改的 Obsidian 增量同步 |
-| `src/course2md/asr/` | 音频解码、faster-whisper 转写与空隙回填、幻觉过滤、抽帧与画面筛选、输出格式 |
+| `src/course2md/asr/` | 音频解码、faster-whisper 转写与空隙回填、幻觉过滤、输出格式 |
+| `src/course2md/frames/` | 按时间抽帧、保存截图，对已有截图应用筛选策略 |
 | `src/course2md/agents/` | Agent 预设接口与注册表、内置 DSH / Codex 预设、统一的 CLI 运行器 |
 | `src/course2md/refine/` | AI 校对、课程记录与两版笔记、读图、课程对话 |
 | `src/course2md/frame_selectors/` | 画面筛选策略接口、内置策略与注册表 |
@@ -69,7 +70,7 @@ pipeline
 stages
 export | doctor
 refine
-asr
+asr | frames
 config
 agents | resolvers | frame_selectors | core
 plugins | storage | util | errors

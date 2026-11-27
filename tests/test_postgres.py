@@ -19,7 +19,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 
 from course2md.core import Database, LeaseLost, TaskQueue
 from course2md.core.models import ArtifactRow, TaskRow
-from course2md.jobs.storage import WorkspaceStore
+from course2md.jobs.workspace_store import WorkspaceStore
 from course2md.storage import LocalFileStore
 
 URL = os.environ.get("COURSE2MD_TEST_DATABASE_URL", "")
