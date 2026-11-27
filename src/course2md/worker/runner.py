@@ -146,7 +146,7 @@ class WorkerRunner:
     def finish(self, task: ClaimedTask, output: Any) -> Any:
         return output
 
-    def execute(self, task: ClaimedTask) -> None:
+    def execute(self, task: ClaimedTask) -> None:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
         self.current = task.id
         if self._on_task_start is not None:
             self._on_task_start(task)

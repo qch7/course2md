@@ -86,7 +86,7 @@ def _resume_id(workspace: Path, agent: AgentConfig) -> str | None:
     return session["session_id"]
 
 
-def continue_notes(
+def continue_notes(  # noqa: PLR0915  历史遗留的长函数，拆分后移除
     workspace: Path,
     message: str,
     history: list[dict],

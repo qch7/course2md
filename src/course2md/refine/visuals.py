@@ -119,7 +119,7 @@ def load_redirects(workspace: Path) -> dict[str, str]:
     return resolved
 
 
-def read_visuals(
+def read_visuals(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     figures: dict[str, Frame],
     cfg: LlmConfig,
     agent: AgentConfig,
