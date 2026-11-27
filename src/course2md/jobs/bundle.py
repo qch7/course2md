@@ -17,9 +17,10 @@ import tempfile
 import time
 import uuid
 import zipfile
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 from .. import __version__
 from ..agents import AgentConfig
@@ -30,6 +31,7 @@ from ..stages.codec import options_from_dict, options_to_dict
 from ..util.job_refs import from_job_refs, resolve_relative, to_job_refs
 from ..util.text import safe_name
 from .manager import ACTIVE_STATUSES, Job, JobManager, _collect_files
+from .records import CourseRecord, MessageRecord
 from .stage_cache import collect_stage_cache, restore_stage_cache
 
 BUNDLE_FORMAT = "course2md-bundle"
@@ -66,15 +68,15 @@ def _should_pack(relative: PurePosixPath) -> bool:
     return True
 
 
-def _sanitize_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    cleaned: list[dict[str, Any]] = []
+def _sanitize_messages(messages: Sequence[Mapping[str, Any]]) -> list[MessageRecord]:
+    cleaned: list[MessageRecord] = []
     for item in messages:
         if not isinstance(item, dict):
             continue
         status = str(item.get("status") or "done")
         if status in ACTIVE_STATUSES:
             status = "interrupted"
-        entry: dict[str, Any] = {
+        entry: MessageRecord = {
             "id": str(item.get("id") or uuid.uuid4().hex),
             "role": str(item.get("role") or "user"),
             "text": str(item.get("text") or ""),
@@ -112,7 +114,7 @@ def _portable_file_bytes(path: Path, relative: PurePosixPath, out_dir: Path) -> 
     return raw
 
 
-def _serialize_course(course: dict[str, Any] | None, jobs: list[Job]) -> dict[str, Any] | None:
+def _serialize_course(course: CourseRecord | None, jobs: list[Job]) -> dict[str, Any] | None:
     if course is None:
         first = jobs[0] if jobs else None
         if first is None:
@@ -170,7 +172,7 @@ def export_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分�
     jobs: list[Job],
     target_path: Path,
     *,
-    course: dict[str, Any] | None = None,
+    course: CourseRecord | None = None,
     include_cache: bool = False,
 ) -> dict[str, Any]:
     """将一个或多个已完成课次任务打包为便携的 .c2m.zip 产物包。
@@ -890,10 +892,11 @@ def import_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分�
 
         if imported_jobs or overwritten_jobs:
             course["updated_at"] = time.time()
+            record = cast(CourseRecord, course)
             with manager.locked():
-                manager.store.save_course(course)
-                manager.courses[course["id"]] = course
-            course_payload = manager.course_snapshot(course)
+                manager.store.save_course(record)
+                manager.courses[record["id"]] = record
+            course_payload = manager.course_snapshot(record)
         elif existed_before:
             course_payload = manager.course_snapshot(manager.courses[course["id"]])
         else:

@@ -17,6 +17,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..core.crypto import COURSE_FIELDS, JOB_FIELDS, FieldCipher
 from ..core.db import Database
 from ..core.models import CourseRow, JobRow
+from .records import CourseRecord
 
 
 class WorkspaceStore:
@@ -27,10 +28,10 @@ class WorkspaceStore:
         self.path = path or Path(self.db.url.removeprefix("sqlite:///"))
         self.cipher = cipher or FieldCipher.from_env()
 
-    def load_courses(self) -> list[dict]:
+    def load_courses(self) -> list[CourseRecord]:
         with self.db.session() as session:
             return [
-                self.cipher.map_fields(json.loads(row.data), COURSE_FIELDS, encrypt=False)
+                cast(CourseRecord, self.cipher.map_fields(json.loads(row.data), COURSE_FIELDS, encrypt=False))
                 for row in session.scalars(select(CourseRow))
             ]
 
@@ -41,9 +42,9 @@ class WorkspaceStore:
                 for row in session.scalars(select(JobRow))
             ]
 
-    def save_course(self, course: dict) -> None:
+    def save_course(self, course: CourseRecord) -> None:
         with self.db.session() as session:
-            stored = self.cipher.map_fields(course, COURSE_FIELDS, encrypt=True)
+            stored = self.cipher.map_fields(cast("dict[str, Any]", course), COURSE_FIELDS, encrypt=True)
             session.merge(CourseRow(id=course["id"], data=json.dumps(stored, ensure_ascii=False)))
 
     def delete_course(self, course_id: str) -> None:

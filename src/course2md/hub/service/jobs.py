@@ -19,6 +19,7 @@ from ...jobs.manager import (
     Job,
     JobManager,
 )
+from ...jobs.records import CourseView
 from ...stages.registry import PIPELINE_STAGES, STAGE_LABELS
 from .common import Forbidden, NotFound, get_job, job_file, request_cancel, server_mode, visible
 
@@ -29,7 +30,7 @@ def list_jobs(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
     return [job.snapshot(0) for job in jobs]
 
 
-def list_courses(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
+def list_courses(manager: JobManager, user: User = LOCAL_USER) -> list[CourseView]:
     with manager.locked():
         courses = [
             course

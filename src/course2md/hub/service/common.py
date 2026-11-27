@@ -13,6 +13,7 @@ from ...jobs.manager import (
     Job,
     JobManager,
 )
+from ...jobs.records import CourseRecord
 
 
 class NotFound(LookupError):
@@ -58,7 +59,9 @@ def get_job(manager: JobManager, job_id: str, user: User = LOCAL_USER, include_d
     return job
 
 
-def get_course(manager: JobManager, course_id: str, user: User = LOCAL_USER, include_deleted: bool = False) -> dict:
+def get_course(
+    manager: JobManager, course_id: str, user: User = LOCAL_USER, include_deleted: bool = False
+) -> CourseRecord:
     course = manager.courses.get(course_id)
     if course is None or not visible(user, course.get("owner")) or (course.get("deleted_at") and not include_deleted):
         raise NotFound("课程不存在")

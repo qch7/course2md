@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from ...core.accounts import LOCAL_USER, User
 from ...jobs.manager import (
@@ -11,6 +12,7 @@ from ...jobs.manager import (
     Job,
     JobManager,
 )
+from ...jobs.records import CourseRecord
 from .common import NotFound, get_course, get_job, request_cancel, server_mode, visible
 
 
@@ -43,13 +45,13 @@ def list_trash(manager: JobManager, user: User = LOCAL_USER) -> dict:
         courses = [c for c in manager.courses.values() if c.get("deleted_at") and visible(user, c.get("owner"))]
         jobs = [j for j in manager.jobs.values() if j.deleted_at is not None and visible(user, j.owner)]
     hidden = {course["id"] for course in courses}
-    items = [
+    items: list[dict[str, Any]] = [
         {
             "kind": "course",
             "id": course["id"],
             "title": course.get("title") or "课程",
-            "deleted_at": course["deleted_at"],
-            "purge_at": course["deleted_at"] + TRASH_SECONDS,
+            "deleted_at": course.get("deleted_at") or 0.0,
+            "purge_at": (course.get("deleted_at") or 0.0) + TRASH_SECONDS,
             "job_count": sum(1 for job in jobs if job.course_id == course["id"]),
         }
         for course in courses
@@ -77,7 +79,7 @@ def list_trash(manager: JobManager, user: User = LOCAL_USER) -> dict:
     }
 
 
-def _trashed(manager: JobManager, kind: str, item_id: str, user: User) -> Job | dict:
+def _trashed(manager: JobManager, kind: str, item_id: str, user: User) -> Job | CourseRecord:
     if kind == "course":
         course = get_course(manager, item_id, user, include_deleted=True)
         if not course.get("deleted_at"):
@@ -93,21 +95,21 @@ def _trashed(manager: JobManager, kind: str, item_id: str, user: User) -> Job | 
 
 def restore_trash(manager: JobManager, kind: str, item_id: str, user: User = LOCAL_USER) -> dict:
     item = _trashed(manager, kind, item_id, user)
-    if isinstance(item, dict):
+    if isinstance(item, Job):
+        manager.mark_job_deleted(item, None)
+    else:
         manager.mark_course_deleted(item, None)
         for job in manager.course_jobs(item):
             if job.deleted_at is not None:
                 manager.mark_job_deleted(job, None)
-    else:
-        manager.mark_job_deleted(item, None)
     return {"ok": True}
 
 
 def purge_trash(manager: JobManager, kind: str, item_id: str, user: User = LOCAL_USER) -> dict:
     """立即永久删除，不再等待保留期。"""
     item = _trashed(manager, kind, item_id, user)
-    if isinstance(item, dict):
-        manager.purge_course(item)
-    else:
+    if isinstance(item, Job):
         manager.purge_job(item)
+    else:
+        manager.purge_course(item)
     return {"ok": True}
