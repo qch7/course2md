@@ -282,7 +282,143 @@ def _render(title: str, lesson: Lesson, figures: dict[str, Frame], evidence: lis
     )
 
 
-def build_note_pair(  # noqa: PLR0915  历史遗留的长函数，拆分后移除
+def _select_figures(
+    frames: list[Frame] | None,
+    workspace: Path,
+    progress: Progress,
+    cancel: threading.Event | None,
+    frame_selector: str,
+) -> tuple[list[Frame], dict[str, Frame]]:
+    """按时间排序并筛选画面，保存筛选报告，返回入选画面与带编号的画面表。"""
+    images = sorted(frames or [], key=lambda frame: frame.ts)
+    from ..frames.selection import select_frames
+
+    def check_cancel() -> None:
+        if cancel and cancel.is_set():
+            raise AgentError("任务已取消")
+
+    images, selection_report = select_frames(
+        images, lambda fraction, message: progress(fraction * 0.05, message), check_cancel, selector_name=frame_selector
+    )
+    (workspace / "frame-selection.json").write_text(
+        json.dumps(selection_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    return images, {f"f{index}": frame for index, frame in enumerate(images, 1)}
+
+
+def _extract_body(
+    segments: list[Segment],
+    title: str,
+    cfg: LlmConfig,
+    workspace: Path,
+    progress: Progress,
+    client: ChatClient | None,
+) -> tuple[str, int, ChatClient | None]:
+    """较长转写先分段提炼证据，返回正文、额外的模型调用次数与（可能新建的）客户端。"""
+    body = "\n".join(f"[{hhmmss(item.start)}] {item.text}" for item in segments)
+    if sum(len(item.text) for item in segments) <= cfg.chunk_chars:
+        return body, 0, client
+    chunks = build_chunks(merge_paragraphs(segments), cfg.chunk_chars)
+    progress(0.05, f"较长课程先提取 {len(chunks)} 段例题与原话证据")
+    client = client or ChatClient(cfg)
+    extracted = summarize_chunks(chunks, title, client, progress)
+    body = "\n\n".join(extracted)
+    (workspace / "extracted-evidence.md").write_text(body, encoding="utf-8")
+    return body, len(chunks), client
+
+
+def _write_context(
+    workspace: Path, title: str, meta: dict[str, str], segments: list[Segment], figures: dict[str, Frame]
+) -> Path:
+    """保存 Schema 与课程材料供 Agent 和后续对话读取，返回 Schema 路径。"""
+    schema_path = workspace / "lesson.schema.json"
+    schema_path.write_text(json.dumps(LESSON_SCHEMA, ensure_ascii=False, indent=2), encoding="utf-8")
+    (workspace / "context.json").write_text(
+        json.dumps(
+            {
+                "title": title,
+                "meta": meta,
+                "segments": [asdict(item) for item in segments],
+                "figures": {key: {"ts": frame.ts, "path": str(frame.path.resolve())} for key, frame in figures.items()},
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return schema_path
+
+
+def _lesson_task(
+    title: str,
+    meta: dict[str, str],
+    figures: dict[str, Frame],
+    redirects: dict[str, str],
+    evidence: list[Evidence],
+    readings: list[dict],
+    native_schema: bool,
+) -> str:
+    """拼出整课提取任务；重复画面只把代表画面交给模型，避免同一页课件被当成不同的配图。"""
+    candidates = {key: frame for key, frame in figures.items() if key not in redirects}
+    figure_list = "\n".join(f"{key} [{frame.label}]" for key, frame in candidates.items())
+    evidence_list = json.dumps([vars(item) for item in evidence], ensure_ascii=False)
+    task = (
+        f"{prompts.LESSON_SYSTEM}\n\n课程 {title}\n课程信息 {json.dumps(meta, ensure_ascii=False)}\n\n"
+        f"图像清单（截图 ID 与时间，重复画面已合并）\n{figure_list}\n\n"
+        f"教师原话证据\n{evidence_list}\n"
+    )
+    if not native_schema:
+        task += "\nJSON Schema\n" + json.dumps(LESSON_SCHEMA, ensure_ascii=False, separators=(",", ":"))
+    if readings:
+        canonical = [page for page in readings if page["figure_id"] not in redirects]
+        task += f"\n逐张读取的画面证据（已读取 {len(readings)}/{len(figures)} 张）\n" + compact_readings(canonical)
+        task += "\n逐条纳入画面中的知识与例题，合并重复内容。unreadable 中的具体缺失应写入待核对项。\n"
+    return task
+
+
+def _request_lesson(
+    task: str,
+    body: str,
+    use_agent: bool,
+    has_images: bool,
+    cfg: LlmConfig,
+    agent: AgentConfig,
+    workspace: Path,
+    schema_path: Path,
+    progress: Progress,
+    cancel: threading.Event | None,
+    client: ChatClient | None,
+    on_output: AgentOutput | None,
+) -> str:
+    """向 Agent 或内置模型发出整课提取请求并返回原始回复。"""
+    response_path = workspace / "lesson.json"
+    if use_agent:
+        response_path.unlink(missing_ok=True)
+        instruction = "Analyze the supplied course text and per-image reading evidence. Return the schema JSON as your final reply. The host saves the output."
+        input_text = (
+            f"{task}\n\n课堂转写或已提取的课堂证据\n{body}\n\n"
+            "请直接分析提供的文字与逐图证据，最终回复仅输出符合 Schema 的 JSON。"
+        )
+        return execute_agent(
+            workspace,
+            replace(agent, output_notes="lesson.json"),
+            progress,
+            cancel,
+            instruction=instruction,
+            input_text=input_text,
+            schema=schema_path,
+            on_output=on_output,
+        )
+    client = client or ChatClient(cfg)
+    if has_images and not cfg.vision:
+        task += "\n当前 API 收到的是图像时间索引，画面可用于回看参考，文字细节依据转写，待核对项保留。\n"
+    response = client.chat([{"role": "user", "content": f"{task}\n\n课堂转写\n{body}"}])
+    response_path.write_text(response, encoding="utf-8")
+    return response
+
+
+def build_note_pair(
     segments: list[Segment],
     title: str,
     meta: dict[str, str],
@@ -305,48 +441,11 @@ def build_note_pair(  # noqa: PLR0915  历史遗留的长函数，拆分后移�
     use_agent = bool(agent.resolved_command())
     started = time.perf_counter()
     workspace.mkdir(parents=True, exist_ok=True)
-    images = sorted(frames or [], key=lambda frame: frame.ts)
-    from ..frames.selection import select_frames
-
-    def check_cancel() -> None:
-        if cancel and cancel.is_set():
-            raise AgentError("任务已取消")
-
-    images, selection_report = select_frames(
-        images, lambda fraction, message: progress(fraction * 0.05, message), check_cancel, selector_name=frame_selector
-    )
-    (workspace / "frame-selection.json").write_text(
-        json.dumps(selection_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    figures = {f"f{index}": frame for index, frame in enumerate(images, 1)}
+    images, figures = _select_figures(frames, workspace, progress, cancel, frame_selector)
     evidence = collect_evidence(segments)
-    transcript = "\n".join(f"[{hhmmss(item.start)}] {item.text}" for item in segments)
-    model_calls = 1
-    body = transcript
-    if sum(len(item.text) for item in segments) > cfg.chunk_chars:
-        chunks = build_chunks(merge_paragraphs(segments), cfg.chunk_chars)
-        progress(0.05, f"较长课程先提取 {len(chunks)} 段例题与原话证据")
-        client = client or ChatClient(cfg)
-        extracted = summarize_chunks(chunks, title, client, progress)
-        body = "\n\n".join(extracted)
-        (workspace / "extracted-evidence.md").write_text(body, encoding="utf-8")
-        model_calls += len(chunks)
-    schema_path = workspace / "lesson.schema.json"
-    schema_path.write_text(json.dumps(LESSON_SCHEMA, ensure_ascii=False, indent=2), encoding="utf-8")
-    (workspace / "context.json").write_text(
-        json.dumps(
-            {
-                "title": title,
-                "meta": meta,
-                "segments": [asdict(item) for item in segments],
-                "figures": {key: {"ts": frame.ts, "path": str(frame.path.resolve())} for key, frame in figures.items()},
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    body, extra_calls, client = _extract_body(segments, title, cfg, workspace, progress, client)
+    model_calls = 1 + extra_calls
+    schema_path = _write_context(workspace, title, meta, segments, figures)
     readings, reading_calls = read_visuals(
         figures,
         cfg,
@@ -358,47 +457,14 @@ def build_note_pair(  # noqa: PLR0915  历史遗留的长函数，拆分后移�
         on_output,
     )
     model_calls += reading_calls
-    # 重复画面只把代表画面交给模型，避免同一页课件被当成不同的配图
     redirects = load_redirects(workspace)
-    candidates = {key: frame for key, frame in figures.items() if key not in redirects}
-    figure_list = "\n".join(f"{key} [{frame.label}]" for key, frame in candidates.items())
-    evidence_list = json.dumps([vars(item) for item in evidence], ensure_ascii=False)
-    task = (
-        f"{prompts.LESSON_SYSTEM}\n\n课程 {title}\n课程信息 {json.dumps(meta, ensure_ascii=False)}\n\n"
-        f"图像清单（截图 ID 与时间，重复画面已合并）\n{figure_list}\n\n"
-        f"教师原话证据\n{evidence_list}\n"
+    task = _lesson_task(
+        title, meta, figures, redirects, evidence, readings, native_schema=use_agent and agent.native_schema
     )
-    if not (use_agent and agent.native_schema):
-        task += "\nJSON Schema\n" + json.dumps(LESSON_SCHEMA, ensure_ascii=False, separators=(",", ":"))
-    if readings:
-        canonical = [page for page in readings if page["figure_id"] not in redirects]
-        task += f"\n逐张读取的画面证据（已读取 {len(readings)}/{len(figures)} 张）\n" + compact_readings(canonical)
-        task += "\n逐条纳入画面中的知识与例题，合并重复内容。unreadable 中的具体缺失应写入待核对项。\n"
-    response_path = workspace / "lesson.json"
     progress(0.75, f"整课提取例题与复习重点（{len(readings)}/{len(images)} 张画面已读取，生成两版笔记）")
-    if use_agent:
-        response_path.unlink(missing_ok=True)
-        instruction = "Analyze the supplied course text and per-image reading evidence. Return the schema JSON as your final reply. The host saves the output."
-        input_text = (
-            f"{task}\n\n课堂转写或已提取的课堂证据\n{body}\n\n"
-            "请直接分析提供的文字与逐图证据，最终回复仅输出符合 Schema 的 JSON。"
-        )
-        response = execute_agent(
-            workspace,
-            replace(agent, output_notes="lesson.json"),
-            progress,
-            cancel,
-            instruction=instruction,
-            input_text=input_text,
-            schema=schema_path,
-            on_output=on_output,
-        )
-    else:
-        client = client or ChatClient(cfg)
-        if images and not cfg.vision:
-            task += "\n当前 API 收到的是图像时间索引，画面可用于回看参考，文字细节依据转写，待核对项保留。\n"
-        response = client.chat([{"role": "user", "content": f"{task}\n\n课堂转写\n{body}"}])
-        response_path.write_text(response, encoding="utf-8")
+    response = _request_lesson(
+        task, body, use_agent, bool(images), cfg, agent, workspace, schema_path, progress, cancel, client, on_output
+    )
     lesson = _parse_lesson(response, segments, figures, evidence)
     apply_figure_redirects(lesson, redirects)
     for page in readings:

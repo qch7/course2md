@@ -18,7 +18,7 @@ import time
 import uuid
 import zipfile
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
@@ -169,7 +169,161 @@ def _serialize_course(course: CourseRecord | None, jobs: list[Job]) -> dict[str,
     }
 
 
-def export_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
+@dataclass
+class _PackTotals:
+    """打包时累计的文件数与字节数；上限对整个产物包生效，因此在各课次间共享。"""
+
+    files: int = 0
+    size: int = 0
+
+
+def _check_exportable(jobs: list[Job]) -> None:
+    if not jobs:
+        raise ValueError("没有可导出或传输的课次产物")
+    for job in jobs:
+        with job.locked():
+            if job.status in ACTIVE_STATUSES or job.pending_messages:
+                raise ValueError(f"课次「{job.title}」正在处理中，请等待完成后再导出或传输")
+            if not job.out_dir.is_dir():
+                raise ValueError(f"课次「{job.title}」的输出目录不存在，无法打包")
+
+
+def _job_manifest_entry(job: Job, key: str) -> tuple[Path, dict[str, Any]]:
+    """在任务锁内生成清单条目；来源与选项在此脱敏，目录内路径改写为 ``job://`` 引用。"""
+    with job.locked():
+        out_dir = job.out_dir.resolve()
+        job_source = public_source(job.source) if job.source else ""
+        serialized_options: dict[str, Any] | None = None
+        if job.options is not None:
+            raw_opts = options_to_dict(job.options)
+            if isinstance(raw_opts.get("source"), str) and raw_opts["source"]:
+                raw_opts["source"] = public_source(raw_opts["source"])
+            serialized_options = to_job_refs(raw_opts, out_dir)
+        serialized_result: dict[str, Any] | None = None
+        if job.result is not None:
+            raw_result = {
+                name: str(getattr(job.result, name)) if getattr(job.result, name) else None
+                for name in ("notes", "detailed_notes", "brief_notes", "note_workspace")
+            }
+            serialized_result = to_job_refs(raw_result, out_dir)
+        job_meta: dict[str, Any] = {
+            "key": key,
+            "origin_id": job.id,
+            "title": job.title,
+            "course": job.course,
+            "session_id": job.session_id,
+            "session_date": job.session_date,
+            "week": job.week,
+            "folder_name": out_dir.name,
+            "source": job_source,
+            "status": job.status if job.status not in ACTIVE_STATUSES else "done",
+            "stage": job.stage,
+            "progress": job.progress,
+            "message": job.message,
+            "error": job.error,
+            "agent": job.agent,
+            "agent_model": job.agent_model,
+            "timings": dict(job.timings),
+            "started_at": job.started_at,
+            "messages": _sanitize_messages(job.messages),
+            "revision": job.revision,
+            "options": serialized_options,
+            "result": serialized_result,
+            "versions": [],
+            "files": [],
+        }
+    return out_dir, job_meta
+
+
+def _pack_job_files(
+    archive: zipfile.ZipFile, key: str, job: Job, out_dir: Path, totals: _PackTotals
+) -> list[dict[str, Any]]:
+    """把课次目录下允许打包的文件写入归档，返回带校验和的文件清单。"""
+    file_records: list[dict[str, Any]] = []
+    for path in sorted(out_dir.rglob("*")):
+        if path.is_symlink() or not path.is_file():
+            continue
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if not resolved.is_relative_to(out_dir):
+            continue
+        rel = PurePosixPath(path.relative_to(out_dir).as_posix())
+        if not _should_pack(rel):
+            continue
+        payload = _portable_file_bytes(path, rel, out_dir)
+        totals.files += 1
+        totals.size += len(payload)
+        if totals.files > MAX_BUNDLE_FILES:
+            raise ValueError(f"产物包文件数量超过上限（{MAX_BUNDLE_FILES}）")
+        if totals.size > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("产物包内容总大小超过上限（1 GB）")
+        arcname = f"jobs/{key}/files/{rel.as_posix()}"
+        archive.writestr(arcname, payload)
+        file_records.append(
+            {
+                "rel": rel.as_posix(),
+                "size": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+    if not file_records:
+        raise ValueError(f"课次「{job.title}」没有可打包的产物文件")
+    return file_records
+
+
+def _pack_versions(archive: zipfile.ZipFile, key: str, versions: Any, job_id: str) -> list[dict[str, Any]]:
+    """把笔记版本历史写入归档，返回版本清单。"""
+    version_entries: list[dict[str, Any]] = []
+    for ver in versions.export_all(job_id):
+        num = int(ver["version"])
+        detailed_arc = f"jobs/{key}/versions/v{num}.detailed.md"
+        detailed_bytes: bytes = ver["detailed_bytes"]
+        archive.writestr(detailed_arc, detailed_bytes)
+        brief_arc = ""
+        brief_bytes: bytes | None = ver["brief_bytes"]
+        if brief_bytes is not None:
+            brief_arc = f"jobs/{key}/versions/v{num}.brief.md"
+            archive.writestr(brief_arc, brief_bytes)
+        version_entries.append(
+            {
+                "version": num,
+                "label": str(ver["label"]),
+                "model": str(ver["model"]),
+                "created_at": float(ver["created_at"]),
+                "detailed_file": detailed_arc,
+                "brief_file": brief_arc,
+            }
+        )
+    return version_entries
+
+
+def _pack_stage_cache(
+    archive: zipfile.ZipFile, key: str, manager: JobManager, job: Job, totals: _PackTotals
+) -> list[dict[str, Any]]:
+    """把各阶段的缓存输出写入归档，返回阶段缓存清单；与文件共用同一份总量上限。"""
+    stage_entries: list[dict[str, Any]] = []
+    for meta, output in collect_stage_cache(manager, job):
+        payload = (json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        totals.files += 1
+        totals.size += len(payload)
+        if totals.files > MAX_BUNDLE_FILES or totals.size > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("产物包内容超过上限，请取消「带上阶段缓存」后重试")
+        arcname = f"jobs/{key}/stages/{meta['stage']}.json"
+        archive.writestr(arcname, payload)
+        stage_entries.append(
+            {
+                **meta,
+                "file": arcname,
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "size": len(payload),
+            }
+        )
+    return stage_entries
+
+
+def export_bundle(
     manager: JobManager,
     jobs: list[Job],
     target_path: Path,
@@ -182,148 +336,27 @@ def export_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分�
     include_cache 为 True 时同时带上各阶段的输出（转写、画面、校对结果等），
     目标 Hub 导入后可以直接从中间阶段重新运行，不必重新下载与转写。
     """
-    if not jobs:
-        raise ValueError("没有可导出或传输的课次产物")
-    for job in jobs:
-        with job.locked():
-            if job.status in ACTIVE_STATUSES or job.pending_messages:
-                raise ValueError(f"课次「{job.title}」正在处理中，请等待完成后再导出或传输")
-            if not job.out_dir.is_dir():
-                raise ValueError(f"课次「{job.title}」的输出目录不存在，无法打包")
+    _check_exportable(jobs)
 
     target_path = Path(target_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=target_path.parent, prefix=".c2m-bundle-", suffix=".zip")
     os.close(fd)
-    total_files = 0
-    total_bytes = 0
+    totals = _PackTotals()
     job_entries: list[dict[str, Any]] = []
 
     try:
         with zipfile.ZipFile(tmp_name, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for index, job in enumerate(jobs):
                 key = f"job-{index}"
-                with job.locked():
-                    out_dir = job.out_dir.resolve()
-                    job_source = public_source(job.source) if job.source else ""
-                    serialized_options: dict[str, Any] | None = None
-                    if job.options is not None:
-                        raw_opts = options_to_dict(job.options)
-                        if isinstance(raw_opts.get("source"), str) and raw_opts["source"]:
-                            raw_opts["source"] = public_source(raw_opts["source"])
-                        serialized_options = to_job_refs(raw_opts, out_dir)
-                    serialized_result: dict[str, Any] | None = None
-                    if job.result is not None:
-                        raw_result = {
-                            name: str(getattr(job.result, name)) if getattr(job.result, name) else None
-                            for name in ("notes", "detailed_notes", "brief_notes", "note_workspace")
-                        }
-                        serialized_result = to_job_refs(raw_result, out_dir)
-                    job_meta: dict[str, Any] = {
-                        "key": key,
-                        "origin_id": job.id,
-                        "title": job.title,
-                        "course": job.course,
-                        "session_id": job.session_id,
-                        "session_date": job.session_date,
-                        "week": job.week,
-                        "folder_name": out_dir.name,
-                        "source": job_source,
-                        "status": job.status if job.status not in ACTIVE_STATUSES else "done",
-                        "stage": job.stage,
-                        "progress": job.progress,
-                        "message": job.message,
-                        "error": job.error,
-                        "agent": job.agent,
-                        "agent_model": job.agent_model,
-                        "timings": dict(job.timings),
-                        "started_at": job.started_at,
-                        "messages": _sanitize_messages(job.messages),
-                        "revision": job.revision,
-                        "options": serialized_options,
-                        "result": serialized_result,
-                        "versions": [],
-                        "files": [],
-                    }
-
-                file_records: list[dict[str, Any]] = []
-                for path in sorted(out_dir.rglob("*")):
-                    if path.is_symlink() or not path.is_file():
-                        continue
-                    try:
-                        resolved = path.resolve()
-                    except OSError:
-                        continue
-                    if not resolved.is_relative_to(out_dir):
-                        continue
-                    rel = PurePosixPath(path.relative_to(out_dir).as_posix())
-                    if not _should_pack(rel):
-                        continue
-                    payload = _portable_file_bytes(path, rel, out_dir)
-                    total_files += 1
-                    total_bytes += len(payload)
-                    if total_files > MAX_BUNDLE_FILES:
-                        raise ValueError(f"产物包文件数量超过上限（{MAX_BUNDLE_FILES}）")
-                    if total_bytes > MAX_UNCOMPRESSED_BYTES:
-                        raise ValueError("产物包内容总大小超过上限（1 GB）")
-                    arcname = f"jobs/{key}/files/{rel.as_posix()}"
-                    archive.writestr(arcname, payload)
-                    file_records.append(
-                        {
-                            "rel": rel.as_posix(),
-                            "size": len(payload),
-                            "sha256": hashlib.sha256(payload).hexdigest(),
-                        }
-                    )
-                if not file_records:
-                    raise ValueError(f"课次「{job.title}」没有可打包的产物文件")
-                job_meta["files"] = file_records
+                out_dir, job_meta = _job_manifest_entry(job, key)
+                job_meta["files"] = _pack_job_files(archive, key, job, out_dir, totals)
 
                 versions = getattr(manager, "versions", None)
                 if versions is not None:
-                    version_entries: list[dict[str, Any]] = []
-                    for ver in versions.export_all(job.id):
-                        num = int(ver["version"])
-                        detailed_arc = f"jobs/{key}/versions/v{num}.detailed.md"
-                        detailed_bytes: bytes = ver["detailed_bytes"]
-                        archive.writestr(detailed_arc, detailed_bytes)
-                        brief_arc = ""
-                        brief_bytes: bytes | None = ver["brief_bytes"]
-                        if brief_bytes is not None:
-                            brief_arc = f"jobs/{key}/versions/v{num}.brief.md"
-                            archive.writestr(brief_arc, brief_bytes)
-                        version_entries.append(
-                            {
-                                "version": num,
-                                "label": str(ver["label"]),
-                                "model": str(ver["model"]),
-                                "created_at": float(ver["created_at"]),
-                                "detailed_file": detailed_arc,
-                                "brief_file": brief_arc,
-                            }
-                        )
-                    job_meta["versions"] = version_entries
-
+                    job_meta["versions"] = _pack_versions(archive, key, versions, job.id)
                 if include_cache:
-                    stage_entries: list[dict[str, Any]] = []
-                    for meta, output in collect_stage_cache(manager, job):
-                        payload = (json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-                        total_files += 1
-                        total_bytes += len(payload)
-                        if total_files > MAX_BUNDLE_FILES or total_bytes > MAX_UNCOMPRESSED_BYTES:
-                            raise ValueError("产物包内容超过上限，请取消「带上阶段缓存」后重试")
-                        arcname = f"jobs/{key}/stages/{meta['stage']}.json"
-                        archive.writestr(arcname, payload)
-                        stage_entries.append(
-                            {
-                                **meta,
-                                "file": arcname,
-                                "sha256": hashlib.sha256(payload).hexdigest(),
-                                "size": len(payload),
-                            }
-                        )
-                    job_meta["stage_cache"] = stage_entries
-
+                    job_meta["stage_cache"] = _pack_stage_cache(archive, key, manager, job, totals)
                 job_entries.append(job_meta)
 
             manifest = {
@@ -346,7 +379,7 @@ def export_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分�
     return {
         "path": target_path,
         "job_count": len(job_entries),
-        "file_count": total_files,
+        "file_count": totals.files,
         "size": target_path.stat().st_size,
     }
 
@@ -500,7 +533,59 @@ def _rename_dir(src: Path, dst: Path) -> None:
             time.sleep(0.05 * (attempt + 1))
 
 
-def _extract_job_files(  # noqa: PLR0912  历史遗留的长函数，拆分后移除
+def _extract_member(
+    archive: zipfile.ZipFile,
+    info: zipfile.ZipInfo,
+    prefix: str,
+    staging: Path,
+    target_dir: Path,
+    expected_hashes: Mapping[str, str],
+    budget: list[int],
+) -> str:
+    """校验并把单个成员写入暂存目录，返回它相对任务目录的路径。"""
+    rel = info.filename[len(prefix) :]
+    dest = resolve_relative(staging, rel)
+    if not dest.resolve().is_relative_to(staging.resolve()):
+        raise ValueError(f"非法的任务内路径：{rel!r}")
+    raw = _read_zip_member(archive, info.filename, budget)
+    expected = expected_hashes.get(rel)
+    if expected and hashlib.sha256(raw).hexdigest() != expected:
+        raise ValueError(f"产物包文件校验失败（内容可能已损坏）：{rel}")
+    if rel == "job.json":
+        try:
+            manifest_data = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            manifest_data = None
+        if isinstance(manifest_data, dict):
+            rewritten = from_job_refs(manifest_data, target_dir)
+            raw = (json.dumps(rewritten, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(raw)
+    return rel
+
+
+def _install_staged(staging: Path, target_dir: Path, *, replace_existing: bool) -> None:
+    """把暂存目录换到目标位置；覆盖时先留备份，换入失败则还原，成功后删除备份。"""
+    backup: Path | None = None
+    try:
+        if target_dir.exists():
+            if not replace_existing:
+                raise ValueError(f"目标目录已存在：{target_dir}")
+            backup = target_dir.with_name(f".c2m-backup-{uuid.uuid4().hex[:8]}")
+            _rename_dir(target_dir, backup)
+        _rename_dir(staging, target_dir)
+        if backup is not None:
+            shutil.rmtree(backup, ignore_errors=True)
+    except BaseException:
+        if backup is not None and backup.exists() and not target_dir.exists():
+            try:
+                _rename_dir(backup, target_dir)
+            except OSError:
+                pass
+        raise
+
+
+def _extract_job_files(
     archive: zipfile.ZipFile,
     key: str,
     file_records: list[dict[str, Any]],
@@ -521,50 +606,17 @@ def _extract_job_files(  # noqa: PLR0912  历史遗留的长函数，拆分后�
 
     target_dir.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=target_dir.parent, prefix=".c2m-import-"))
-    backup: Path | None = None
     try:
         seen_rels: set[str] = set()
         for info in members:
-            rel = info.filename[len(prefix) :]
-            dest = resolve_relative(staging, rel)
-            if not dest.resolve().is_relative_to(staging.resolve()):
-                raise ValueError(f"非法的任务内路径：{rel!r}")
-            raw = _read_zip_member(archive, info.filename, budget)
-            expected = expected_hashes.get(rel)
-            if expected and hashlib.sha256(raw).hexdigest() != expected:
-                raise ValueError(f"产物包文件校验失败（内容可能已损坏）：{rel}")
-            if rel == "job.json":
-                try:
-                    manifest_data = json.loads(raw.decode("utf-8"))
-                except (UnicodeDecodeError, ValueError):
-                    manifest_data = None
-                if isinstance(manifest_data, dict):
-                    rewritten = from_job_refs(manifest_data, target_dir)
-                    raw = (json.dumps(rewritten, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(raw)
-            seen_rels.add(rel)
-
+            seen_rels.add(_extract_member(archive, info, prefix, staging, target_dir, expected_hashes, budget))
         missing = set(expected_hashes) - seen_rels
         if missing:
             raise ValueError(f"产物包缺少清单声明的文件：{sorted(missing)[0]}")
-
-        if target_dir.exists():
-            if not replace_existing:
-                raise ValueError(f"目标目录已存在：{target_dir}")
-            backup = target_dir.with_name(f".c2m-backup-{uuid.uuid4().hex[:8]}")
-            _rename_dir(target_dir, backup)
-        _rename_dir(staging, target_dir)
-        if backup is not None:
-            shutil.rmtree(backup, ignore_errors=True)
+        _install_staged(staging, target_dir, replace_existing=replace_existing)
     except BaseException:
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
-        if backup is not None and backup.exists() and not target_dir.exists():
-            try:
-                _rename_dir(backup, target_dir)
-            except OSError:
-                pass
         raise
 
 
@@ -686,7 +738,290 @@ def _merge_course_session(course: dict[str, Any], job: Job) -> None:
     course["sessions"] = sessions
 
 
-def import_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
+@dataclass
+class _ImportReport:
+    """导入过程中逐课次累积的结果。"""
+
+    imported: list[dict[str, Any]] = field(default_factory=list)
+    overwritten: list[dict[str, Any]] = field(default_factory=list)
+    skipped: list[dict[str, Any]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _ImportContext:
+    """导入单个产物包时各课次共用的状态；``budget`` 是跨成员共享的解压字节预算。"""
+
+    manager: JobManager
+    owner: str
+    root: Path
+    conflict: str
+    server_mode: bool
+    is_admin: bool
+    origin_label: str
+    archive: zipfile.ZipFile
+    names: set[str]
+    budget: list[int]
+    course: dict[str, Any]
+    report: _ImportReport = field(default_factory=_ImportReport)
+
+
+@dataclass
+class _ImportTarget:
+    """单个课次的落盘位置与冲突处理结论；``skip_reason`` 非空表示该课次不导入。"""
+
+    target_dir: Path
+    existing: Job | None
+    overwrite: bool
+    is_conflict: bool
+    skip_reason: str = ""
+
+
+def _check_bundle_file(bundle_path: Path) -> None:
+    if not bundle_path.is_file():
+        raise ValueError("产物包文件不存在")
+    if bundle_path.stat().st_size > MAX_BUNDLE_BYTES:
+        raise ValueError(f"产物包大小超过上限（{MAX_BUNDLE_BYTES // (1024 * 1024)} MB）")
+
+
+def _open_bundle(bundle_path: Path) -> zipfile.ZipFile:
+    try:
+        return zipfile.ZipFile(bundle_path, "r")
+    except zipfile.BadZipFile as exc:
+        raise ValueError("上传的文件不是有效的 course2md 产物包（ZIP 格式无效）") from exc
+
+
+def _read_manifest(archive: zipfile.ZipFile, budget: list[int]) -> tuple[set[str], list[Any], dict[str, Any]]:
+    """校验归档的条目数、路径与总大小并解析清单，返回（成员名集合，课次清单，课程清单）。"""
+    infos = archive.infolist()
+    if len(infos) > MAX_BUNDLE_FILES + 50:
+        raise ValueError("产物包内文件数超过安全上限")
+    declared_total = 0
+    for info in infos:
+        _check_archive_entry(info)
+        declared_total += info.file_size
+        if declared_total > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("产物包解压总大小超过安全上限（1 GB）")
+    names = {info.filename for info in infos}
+    if "bundle.json" not in names:
+        raise ValueError("产物包缺少 bundle.json 清单，不是有效的 course2md 产物包")
+    try:
+        manifest = json.loads(
+            _read_zip_member(archive, "bundle.json", budget, limit=MAX_MANIFEST_BYTES).decode("utf-8")
+        )
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ValueError("产物包清单 bundle.json 无法解析") from exc
+    if not isinstance(manifest, dict) or manifest.get("format") != BUNDLE_FORMAT:
+        raise ValueError("不支持的产物包格式")
+    if manifest.get("version") != BUNDLE_VERSION:
+        raise ValueError(f"不支持的产物包版本：{manifest.get('version')!r}（当前仅支持 {BUNDLE_VERSION}）")
+    raw_jobs = manifest.get("jobs")
+    if not isinstance(raw_jobs, list) or not raw_jobs:
+        raise ValueError("产物包中没有可导入的课次")
+    raw_course = manifest.get("course")
+    course_meta: dict[str, Any] = raw_course if isinstance(raw_course, dict) else {}
+    return names, raw_jobs, course_meta
+
+
+def _plan_target(
+    ctx: _ImportContext, entry: dict[str, Any], key: str, title: str, job_course: str, session_id: str
+) -> _ImportTarget:
+    """决定课次落盘目录，并按冲突策略判断跳过、覆盖或另存副本。"""
+    folder_name = safe_name(
+        str(entry.get("folder_name") or entry.get("session_date") or title or key),
+        "session",
+    )
+    course_dir = safe_name(job_course or ctx.course.get("title") or "未分类", "未分类")
+    target_dir = (ctx.root / course_dir / folder_name).resolve()
+    if not target_dir.is_relative_to(ctx.root):
+        raise ValueError("目标课次路径超出输出根目录")
+
+    existing = _find_conflicting_job(ctx.manager, ctx.owner, ctx.course["id"], session_id, target_dir)
+    dir_non_empty = target_dir.is_dir() and any(target_dir.iterdir())
+    is_conflict = existing is not None or dir_non_empty
+    overwrite_this = False
+
+    if is_conflict:
+        if ctx.conflict == "skip":
+            return _ImportTarget(target_dir, existing, False, True, "目标 Hub 已存在同名课次，已跳过")
+        if ctx.conflict == "overwrite":
+            if existing is not None and (existing.status in ACTIVE_STATUSES or existing.pending_messages):
+                return _ImportTarget(target_dir, existing, False, True, "目标课次正在处理中，无法覆盖")
+            if existing is not None:
+                target_dir = existing.out_dir.resolve()
+                if not target_dir.is_relative_to(ctx.root):
+                    target_dir = (ctx.root / course_dir / folder_name).resolve()
+            overwrite_this = True
+        elif ctx.conflict == "copy":
+            target_dir = _allocate_copy_dir(ctx.manager, target_dir.parent, folder_name, ctx.root)
+            existing = None
+    return _ImportTarget(target_dir, existing, overwrite_this, is_conflict)
+
+
+def _job_from_entry(
+    ctx: _ImportContext,
+    entry: dict[str, Any],
+    *,
+    job_id: str,
+    target_dir: Path,
+    title: str,
+    job_course: str,
+    session_id: str,
+) -> tuple[Job, JobResult]:
+    """按清单条目重建任务记录：凭证置空、状态归一、路径还原到目标目录。"""
+    raw_timings = entry.get("timings")
+    timings = {str(k): float(v) for k, v in raw_timings.items()} if isinstance(raw_timings, dict) else {}
+    status = str(entry.get("status") or "done")
+    if status in ACTIVE_STATUSES:
+        status = "done"
+    options = _sanitize_imported_options(
+        entry.get("options"),
+        target_dir,
+        server_mode=ctx.server_mode,
+        is_admin=ctx.is_admin,
+    )
+    result = _resolve_result(entry.get("result"), target_dir, timings)
+    job = Job(
+        id=job_id,
+        source=str(entry.get("source") or ""),
+        title=title,
+        out_dir=target_dir,
+        course=job_course,
+        course_id=ctx.course["id"],
+        session_id=session_id,
+        session_date=str(entry.get("session_date") or ""),
+        week=entry.get("week") if isinstance(entry.get("week"), int) else None,
+        status=status,
+        stage=str(entry.get("stage") or "完成"),
+        progress=float(1.0 if entry.get("progress") is None else entry["progress"]),
+        message=str(entry.get("message") or f"已从{ctx.origin_label}导入"),
+        error=str(entry.get("error") or ""),
+        started_at=float(entry.get("started_at") or time.time()),
+        agent=str(entry.get("agent") or ""),
+        agent_model=str(entry.get("agent_model") or ""),
+        owner=ctx.owner,
+        timings=timings,
+        messages=_sanitize_messages(list(entry.get("messages") or [])),
+        revision=max(1, int(entry.get("revision") or 1)),
+        options=options,
+        result=result,
+    )
+    return job, result
+
+
+def _restore_versions(ctx: _ImportContext, versions: Any, job_id: str, raw_versions: Any) -> int:
+    """按版本号顺序把包内的笔记版本写回版本库，返回成功还原的数量。"""
+    restored = 0
+    if not isinstance(raw_versions, list):
+        return restored
+    for ver in sorted(
+        (item for item in raw_versions if isinstance(item, dict)),
+        key=lambda item: int(item.get("version") or 0),
+    ):
+        detailed_arc = str(ver.get("detailed_file") or "")
+        if not detailed_arc or detailed_arc not in ctx.names:
+            continue
+        detailed_bytes = _read_zip_member(ctx.archive, detailed_arc, ctx.budget)
+        brief_arc = str(ver.get("brief_file") or "")
+        brief_bytes = (
+            _read_zip_member(ctx.archive, brief_arc, ctx.budget) if brief_arc and brief_arc in ctx.names else None
+        )
+        versions.import_version(
+            job_id,
+            detailed_bytes,
+            brief_bytes,
+            str(ver.get("label") or "导入"),
+            str(ver.get("model") or ""),
+            float(ver["created_at"]) if ver.get("created_at") is not None else None,
+        )
+        restored += 1
+    return restored
+
+
+def _import_versions(
+    ctx: _ImportContext, entry: dict[str, Any], job: Job, result: JobResult, *, overwrite: bool
+) -> None:
+    versions = getattr(ctx.manager, "versions", None)
+    if versions is None:
+        return
+    if overwrite:
+        versions.discard(job.id)
+    restored = _restore_versions(ctx, versions, job.id, entry.get("versions") or [])
+    # 包里没有版本历史时，用当前笔记补一条，保证导入后版本列表不为空
+    if restored == 0 and result.detailed_notes and result.detailed_notes.is_file():
+        ctx.manager.record_version(job, f"从{ctx.origin_label}导入")
+
+
+def _import_entry(ctx: _ImportContext, entry: Any) -> None:
+    """导入清单中的一个课次，结果记入 ``ctx.report``。"""
+    if not isinstance(entry, dict) or not entry.get("key"):
+        raise ValueError("产物包课次清单格式无效")
+    key = str(entry["key"])
+    title = str(entry.get("title") or "未命名课次")
+    job_course = str(entry.get("course") or ctx.course.get("course") or ctx.course.get("title") or "")
+    session_id = str(entry.get("session_id") or "")
+
+    target = _plan_target(ctx, entry, key, title, job_course, session_id)
+    if target.skip_reason:
+        ctx.report.skipped.append({"title": title, "session_id": session_id, "reason": target.skip_reason})
+        return
+
+    stage_items = _read_stage_cache(ctx.archive, key, entry.get("stage_cache"), ctx.names, ctx.budget)
+    _extract_job_files(
+        ctx.archive,
+        key,
+        list(entry.get("files") or []),
+        target.target_dir,
+        ctx.budget,
+        replace_existing=target.overwrite,
+    )
+
+    existing = target.existing
+    job_id = existing.id if (target.overwrite and existing is not None) else uuid.uuid4().hex[:12]
+    job, result = _job_from_entry(
+        ctx,
+        entry,
+        job_id=job_id,
+        target_dir=target.target_dir,
+        title=title,
+        job_course=job_course,
+        session_id="" if (ctx.conflict == "copy" and target.is_conflict) else session_id,
+    )
+    job.files = collect_files(result)
+    job.log(f"已从{ctx.origin_label}导入")
+
+    with ctx.manager.locked():
+        ctx.manager.save_job(job, replace_existing=True)
+        ctx.manager.jobs[job.id] = job
+
+    if stage_items:
+        _, cache_warnings = restore_stage_cache(ctx.manager, job, stage_items, replace=target.overwrite)
+        ctx.report.warnings.extend(f"「{title}」{message}" for message in cache_warnings)
+
+    _import_versions(ctx, entry, job, result, overwrite=target.overwrite)
+
+    _merge_course_session(ctx.course, job)
+    snap = job.snapshot(0)
+    (ctx.report.overwritten if target.overwrite else ctx.report.imported).append(snap)
+
+
+def _save_imported_course(
+    manager: JobManager, course: dict[str, Any], existed_before: bool, report: _ImportReport
+) -> Any:
+    """有课次落地时保存课程记录；返回写入后的课程视图，没有变化且课程原本不存在时为 None。"""
+    if report.imported or report.overwritten:
+        course["updated_at"] = time.time()
+        record = cast(CourseRecord, course)
+        with manager.locked():
+            manager.store.save_course(record)
+            manager.courses[record["id"]] = record
+        return manager.course_snapshot(record)
+    if existed_before:
+        return manager.course_snapshot(manager.courses[course["id"]])
+    return None
+
+
+def import_bundle(
     manager: JobManager,
     bundle_path: Path,
     *,
@@ -701,213 +1036,39 @@ def import_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分�
     if conflict not in CONFLICT_MODES:
         raise ValueError(f"不支持的冲突处理策略：{conflict!r}，可选 {', '.join(CONFLICT_MODES)}")
     bundle_path = Path(bundle_path)
-    if not bundle_path.is_file():
-        raise ValueError("产物包文件不存在")
-    if bundle_path.stat().st_size > MAX_BUNDLE_BYTES:
-        raise ValueError(f"产物包大小超过上限（{MAX_BUNDLE_BYTES // (1024 * 1024)} MB）")
+    _check_bundle_file(bundle_path)
 
     root = Path(root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     budget = [MAX_UNCOMPRESSED_BYTES]
 
-    try:
-        archive = zipfile.ZipFile(bundle_path, "r")
-    except zipfile.BadZipFile as exc:
-        raise ValueError("上传的文件不是有效的 course2md 产物包（ZIP 格式无效）") from exc
-
-    with archive:
-        infos = archive.infolist()
-        if len(infos) > MAX_BUNDLE_FILES + 50:
-            raise ValueError("产物包内文件数超过安全上限")
-        declared_total = 0
-        for info in infos:
-            _check_archive_entry(info)
-            declared_total += info.file_size
-            if declared_total > MAX_UNCOMPRESSED_BYTES:
-                raise ValueError("产物包解压总大小超过安全上限（1 GB）")
-        names = {info.filename for info in infos}
-        if "bundle.json" not in names:
-            raise ValueError("产物包缺少 bundle.json 清单，不是有效的 course2md 产物包")
-        try:
-            manifest = json.loads(
-                _read_zip_member(archive, "bundle.json", budget, limit=MAX_MANIFEST_BYTES).decode("utf-8")
-            )
-        except (UnicodeDecodeError, ValueError) as exc:
-            raise ValueError("产物包清单 bundle.json 无法解析") from exc
-        if not isinstance(manifest, dict) or manifest.get("format") != BUNDLE_FORMAT:
-            raise ValueError("不支持的产物包格式")
-        if manifest.get("version") != BUNDLE_VERSION:
-            raise ValueError(f"不支持的产物包版本：{manifest.get('version')!r}（当前仅支持 {BUNDLE_VERSION}）")
-        raw_jobs = manifest.get("jobs")
-        if not isinstance(raw_jobs, list) or not raw_jobs:
-            raise ValueError("产物包中没有可导入的课次")
-
-        raw_course = manifest.get("course")
-        course_meta: dict[str, Any] = raw_course if isinstance(raw_course, dict) else {}
+    with _open_bundle(bundle_path) as archive:
+        names, raw_jobs, course_meta = _read_manifest(archive, budget)
         first_title = str(raw_jobs[0].get("course") or raw_jobs[0].get("title") or "导入课程")
         course = _match_course(manager, owner, root, course_meta, first_title)
         existed_before = course["id"] in manager.courses
 
-        imported_jobs: list[dict[str, Any]] = []
-        overwritten_jobs: list[dict[str, Any]] = []
-        skipped_jobs: list[dict[str, Any]] = []
-        warnings: list[str] = []
-
+        ctx = _ImportContext(
+            manager=manager,
+            owner=owner,
+            root=root,
+            conflict=conflict,
+            server_mode=server_mode,
+            is_admin=is_admin,
+            origin_label=origin_label,
+            archive=archive,
+            names=names,
+            budget=budget,
+            course=course,
+        )
         for entry in raw_jobs:
-            if not isinstance(entry, dict) or not entry.get("key"):
-                raise ValueError("产物包课次清单格式无效")
-            key = str(entry["key"])
-            title = str(entry.get("title") or "未命名课次")
-            job_course = str(entry.get("course") or course.get("course") or course.get("title") or "")
-            session_id = str(entry.get("session_id") or "")
-            folder_name = safe_name(
-                str(entry.get("folder_name") or entry.get("session_date") or title or key),
-                "session",
-            )
-            course_dir = safe_name(job_course or course.get("title") or "未分类", "未分类")
-            target_dir = (root / course_dir / folder_name).resolve()
-            if not target_dir.is_relative_to(root):
-                raise ValueError("目标课次路径超出输出根目录")
+            _import_entry(ctx, entry)
 
-            existing = _find_conflicting_job(manager, owner, course["id"], session_id, target_dir)
-            dir_non_empty = target_dir.is_dir() and any(target_dir.iterdir())
-            is_conflict = existing is not None or dir_non_empty
-            overwrite_this = False
-
-            if is_conflict:
-                if conflict == "skip":
-                    skipped_jobs.append(
-                        {"title": title, "session_id": session_id, "reason": "目标 Hub 已存在同名课次，已跳过"}
-                    )
-                    continue
-                if conflict == "overwrite":
-                    if existing is not None and (existing.status in ACTIVE_STATUSES or existing.pending_messages):
-                        skipped_jobs.append(
-                            {"title": title, "session_id": session_id, "reason": "目标课次正在处理中，无法覆盖"}
-                        )
-                        continue
-                    if existing is not None:
-                        target_dir = existing.out_dir.resolve()
-                        if not target_dir.is_relative_to(root):
-                            target_dir = (root / course_dir / folder_name).resolve()
-                    overwrite_this = True
-                elif conflict == "copy":
-                    target_dir = _allocate_copy_dir(manager, target_dir.parent, folder_name, root)
-                    existing = None
-
-            stage_items = _read_stage_cache(archive, key, entry.get("stage_cache"), names, budget)
-            _extract_job_files(
-                archive,
-                key,
-                list(entry.get("files") or []),
-                target_dir,
-                budget,
-                replace_existing=overwrite_this,
-            )
-
-            job_id = existing.id if (overwrite_this and existing is not None) else uuid.uuid4().hex[:12]
-            raw_timings = entry.get("timings")
-            timings = {str(k): float(v) for k, v in raw_timings.items()} if isinstance(raw_timings, dict) else {}
-            status = str(entry.get("status") or "done")
-            if status in ACTIVE_STATUSES:
-                status = "done"
-            options = _sanitize_imported_options(
-                entry.get("options"),
-                target_dir,
-                server_mode=server_mode,
-                is_admin=is_admin,
-            )
-            result = _resolve_result(entry.get("result"), target_dir, timings)
-            job = Job(
-                id=job_id,
-                source=str(entry.get("source") or ""),
-                title=title,
-                out_dir=target_dir,
-                course=job_course,
-                course_id=course["id"],
-                session_id=session_id if not (conflict == "copy" and is_conflict) else "",
-                session_date=str(entry.get("session_date") or ""),
-                week=entry.get("week") if isinstance(entry.get("week"), int) else None,
-                status=status,
-                stage=str(entry.get("stage") or "完成"),
-                progress=float(1.0 if entry.get("progress") is None else entry["progress"]),
-                message=str(entry.get("message") or f"已从{origin_label}导入"),
-                error=str(entry.get("error") or ""),
-                started_at=float(entry.get("started_at") or time.time()),
-                agent=str(entry.get("agent") or ""),
-                agent_model=str(entry.get("agent_model") or ""),
-                owner=owner,
-                timings=timings,
-                messages=_sanitize_messages(list(entry.get("messages") or [])),
-                revision=max(1, int(entry.get("revision") or 1)),
-                options=options,
-                result=result,
-            )
-            job.files = collect_files(result)
-            job.log(f"已从{origin_label}导入")
-
-            with manager.locked():
-                manager.save_job(job, replace_existing=True)
-                manager.jobs[job.id] = job
-
-            if stage_items:
-                _, cache_warnings = restore_stage_cache(manager, job, stage_items, replace=overwrite_this)
-                warnings.extend(f"「{title}」{message}" for message in cache_warnings)
-
-            versions = getattr(manager, "versions", None)
-            if versions is not None:
-                if overwrite_this:
-                    versions.discard(job.id)
-                raw_versions = entry.get("versions") or []
-                restored_versions = 0
-                if isinstance(raw_versions, list):
-                    for ver in sorted(
-                        (item for item in raw_versions if isinstance(item, dict)),
-                        key=lambda item: int(item.get("version") or 0),
-                    ):
-                        detailed_arc = str(ver.get("detailed_file") or "")
-                        if not detailed_arc or detailed_arc not in names:
-                            continue
-                        detailed_bytes = _read_zip_member(archive, detailed_arc, budget)
-                        brief_arc = str(ver.get("brief_file") or "")
-                        brief_bytes = (
-                            _read_zip_member(archive, brief_arc, budget) if brief_arc and brief_arc in names else None
-                        )
-                        versions.import_version(
-                            job.id,
-                            detailed_bytes,
-                            brief_bytes,
-                            str(ver.get("label") or "导入"),
-                            str(ver.get("model") or ""),
-                            float(ver["created_at"]) if ver.get("created_at") is not None else None,
-                        )
-                        restored_versions += 1
-                if restored_versions == 0 and result.detailed_notes and result.detailed_notes.is_file():
-                    manager.record_version(job, f"从{origin_label}导入")
-
-            _merge_course_session(course, job)
-            snap = job.snapshot(0)
-            if overwrite_this:
-                overwritten_jobs.append(snap)
-            else:
-                imported_jobs.append(snap)
-
-        if imported_jobs or overwritten_jobs:
-            course["updated_at"] = time.time()
-            record = cast(CourseRecord, course)
-            with manager.locked():
-                manager.store.save_course(record)
-                manager.courses[record["id"]] = record
-            course_payload = manager.course_snapshot(record)
-        elif existed_before:
-            course_payload = manager.course_snapshot(manager.courses[course["id"]])
-        else:
-            course_payload = None
-
+        report = ctx.report
         return {
-            "course": course_payload,
-            "imported": imported_jobs,
-            "overwritten": overwritten_jobs,
-            "skipped": skipped_jobs,
-            "warnings": warnings,
+            "course": _save_imported_course(manager, course, existed_before, report),
+            "imported": report.imported,
+            "overwritten": report.overwritten,
+            "skipped": report.skipped,
+            "warnings": report.warnings,
         }

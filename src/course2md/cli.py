@@ -7,8 +7,11 @@ import json
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
+from typing import Any
 
 from .config import (
     AsrConfig,
@@ -141,93 +144,125 @@ def _print_transfer_summary(result: dict) -> None:
         print(f"  - {item.get('title') or ''}（{item.get('reason') or '已跳过'}）")
 
 
-def cmd_transfer(args) -> int:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
+def _transfer_list(args: argparse.Namespace) -> int:
+    from .hub.transfer import RemoteHubClient
+
+    with RemoteHubClient(args.hub, args.token or "") as remote:
+        catalog = remote.catalog()
+    print(f"Hub：{catalog['hub_url']}（{catalog['mode']}）")
+    courses = catalog.get("courses") or []
+    if not courses:
+        print("没有可传输的课程产物")
+        return 0
+    for course in courses:
+        cid = course.get("id") or "-"
+        print(f"\n课程 [{cid}] {course.get('title')}")
+        for job in course.get("jobs") or []:
+            mark = "可传" if job.get("transferable") else "处理中/无文件"
+            date = job.get("session_date") or ""
+            print(f"  - [{job['id']}] {job.get('title')}  {date}  ({mark}, {job.get('file_count', 0)} 个文件)")
+    return 0
+
+
+def _transfer_export(args: argparse.Namespace) -> int:
+    from .hub.transfer import RemoteHubClient
+
+    if not args.course and not args.job:
+        raise SystemExit("请指定 --course 或 --job")
+    target = Path(args.out).expanduser().resolve()
+    with RemoteHubClient(args.hub, args.token or "") as remote:
+        if args.course:
+            remote.download_course_bundle(args.course, target, job_ids=args.job or None, include_cache=args.with_cache)
+        else:
+            remote.download_job_bundle(args.job[0], target, include_cache=args.with_cache)
+    print(f"产物包已导出：{target}（{target.stat().st_size / 1024:.0f} KB）")
+    return 0
+
+
+def _transfer_import(args: argparse.Namespace) -> int:
+    from .hub.transfer import RemoteHubClient
+
+    bundle_file = Path(args.bundle).expanduser().resolve()
+    if not bundle_file.is_file():
+        raise SystemExit(f"找不到产物包：{bundle_file}")
+    with RemoteHubClient(args.hub, args.token or "") as remote:
+        result = remote.push_bundle(bundle_file, conflict=args.conflict)
+    _print_transfer_summary(result)
+    return 0
+
+
+def _copy_bundle_via_tempfile(download: Callable[[Path], object], dst: Any, conflict: str) -> dict:
+    """先把来源 Hub 的产物包落到临时文件，再推给目标 Hub，无论成败都删除临时文件。"""
     import os
     import tempfile
 
-    from .hub.transfer import RemoteHubClient, TransferError
-
-    action = args.transfer_action
+    fd, tmp_name = tempfile.mkstemp(prefix="c2m-cli-", suffix=".c2m.zip")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
     try:
-        if action == "list":
-            with RemoteHubClient(args.hub, args.token or "") as remote:
-                catalog = remote.catalog()
-            print(f"Hub：{catalog['hub_url']}（{catalog['mode']}）")
-            courses = catalog.get("courses") or []
-            if not courses:
-                print("没有可传输的课程产物")
-                return 0
-            for course in courses:
-                cid = course.get("id") or "-"
-                print(f"\n课程 [{cid}] {course.get('title')}")
-                for job in course.get("jobs") or []:
-                    mark = "可传" if job.get("transferable") else "处理中/无文件"
-                    date = job.get("session_date") or ""
-                    print(f"  - [{job['id']}] {job.get('title')}  {date}  ({mark}, {job.get('file_count', 0)} 个文件)")
-            return 0
+        download(tmp_path)
+        return dst.push_bundle(tmp_path, conflict=conflict)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
-        if action == "export":
-            if not args.course and not args.job:
-                raise SystemExit("请指定 --course 或 --job")
-            target = Path(args.out).expanduser().resolve()
-            with RemoteHubClient(args.hub, args.token or "") as remote:
-                if args.course:
-                    remote.download_course_bundle(
-                        args.course, target, job_ids=args.job or None, include_cache=args.with_cache
+
+def _transfer_copy(args: argparse.Namespace) -> int:
+    from .hub.transfer import RemoteHubClient
+
+    if not args.course and not args.job:
+        raise SystemExit("请指定 --course 或 --job")
+    imported: list[dict] = []
+    overwritten: list[dict] = []
+    skipped: list[dict] = []
+
+    def collect(res: dict) -> None:
+        imported.extend(res.get("imported") or [])
+        overwritten.extend(res.get("overwritten") or [])
+        skipped.extend(res.get("skipped") or [])
+
+    with (
+        RemoteHubClient(args.source_hub, args.source_token or "") as src,
+        RemoteHubClient(args.target_hub, args.target_token or "") as dst,
+    ):
+        if args.course:
+            collect(
+                _copy_bundle_via_tempfile(
+                    partial(
+                        src.download_course_bundle, args.course, job_ids=args.job or None, include_cache=args.with_cache
+                    ),
+                    dst,
+                    args.conflict,
+                )
+            )
+        else:
+            for jid in args.job:
+                collect(
+                    _copy_bundle_via_tempfile(
+                        # partial 立即绑定当前 jid，避免闭包晚绑定
+                        partial(src.download_job_bundle, jid, include_cache=args.with_cache),
+                        dst,
+                        args.conflict,
                     )
-                else:
-                    remote.download_job_bundle(args.job[0], target, include_cache=args.with_cache)
-            print(f"产物包已导出：{target}（{target.stat().st_size / 1024:.0f} KB）")
-            return 0
+                )
+    _print_transfer_summary({"imported": imported, "overwritten": overwritten, "skipped": skipped})
+    return 0
 
-        if action == "import":
-            bundle_file = Path(args.bundle).expanduser().resolve()
-            if not bundle_file.is_file():
-                raise SystemExit(f"找不到产物包：{bundle_file}")
-            with RemoteHubClient(args.hub, args.token or "") as remote:
-                result = remote.push_bundle(bundle_file, conflict=args.conflict)
-            _print_transfer_summary(result)
-            return 0
 
-        if action == "copy":
-            if not args.course and not args.job:
-                raise SystemExit("请指定 --course 或 --job")
-            imported: list[dict] = []
-            overwritten: list[dict] = []
-            skipped: list[dict] = []
-            with (
-                RemoteHubClient(args.source_hub, args.source_token or "") as src,
-                RemoteHubClient(args.target_hub, args.target_token or "") as dst,
-            ):
-                if args.course:
-                    fd, tmp_name = tempfile.mkstemp(prefix="c2m-cli-", suffix=".c2m.zip")
-                    os.close(fd)
-                    tmp_path = Path(tmp_name)
-                    try:
-                        src.download_course_bundle(
-                            args.course, tmp_path, job_ids=args.job or None, include_cache=args.with_cache
-                        )
-                        res = dst.push_bundle(tmp_path, conflict=args.conflict)
-                        imported.extend(res.get("imported") or [])
-                        overwritten.extend(res.get("overwritten") or [])
-                        skipped.extend(res.get("skipped") or [])
-                    finally:
-                        tmp_path.unlink(missing_ok=True)
-                else:
-                    for jid in args.job:
-                        fd, tmp_name = tempfile.mkstemp(prefix="c2m-cli-", suffix=".c2m.zip")
-                        os.close(fd)
-                        tmp_path = Path(tmp_name)
-                        try:
-                            src.download_job_bundle(jid, tmp_path, include_cache=args.with_cache)
-                            res = dst.push_bundle(tmp_path, conflict=args.conflict)
-                            imported.extend(res.get("imported") or [])
-                            overwritten.extend(res.get("overwritten") or [])
-                            skipped.extend(res.get("skipped") or [])
-                        finally:
-                            tmp_path.unlink(missing_ok=True)
-            _print_transfer_summary({"imported": imported, "overwritten": overwritten, "skipped": skipped})
-            return 0
+_TRANSFER_ACTIONS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "list": _transfer_list,
+    "export": _transfer_export,
+    "import": _transfer_import,
+    "copy": _transfer_copy,
+}
+
+
+def cmd_transfer(args) -> int:
+    from .hub.transfer import TransferError
+
+    handler = _TRANSFER_ACTIONS.get(args.transfer_action)
+    try:
+        if handler is not None:
+            return handler(args)
     except TransferError as exc:
         print(f"传输失败：{exc}", file=sys.stderr)
         return 1
@@ -442,12 +477,9 @@ def cmd_web(args) -> int:
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
+def _add_run_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     asr_env = AsrConfig.from_env()
     llm_env = LlmConfig.from_env()
-    parser = argparse.ArgumentParser(prog="course2md", description="课程回放 → 结构化 Markdown 笔记")
-    sub = parser.add_subparsers(dest="command", required=True)
-
     run = sub.add_parser("run", help="完整流水线：解析 → 转写 → 整理")
     run.add_argument("source", help="播放页链接或本地文件/目录")
     run.add_argument("-o", "--out", default=default_out_dir(), help="输出目录（默认 %(default)s）")
@@ -485,10 +517,15 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915  历史遗留的
     run.add_argument("--keep-audio", action="store_true", help="保留中间 WAV")
     run.set_defaults(func=cmd_run)
 
+
+def _add_list_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     list_cmd = sub.add_parser("list", help="列出可下载的课次")
     list_cmd.add_argument("source")
     list_cmd.set_defaults(func=cmd_list)
 
+
+def _add_refine_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    llm_env = LlmConfig.from_env()
     refine = sub.add_parser("refine", help="把已有转写稿整理成笔记")
     refine.add_argument("transcript", help=".srt 或 .md 转写稿")
     refine.add_argument("-o", "--out", help="输出路径")
@@ -514,14 +551,20 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915  历史遗留的
     refine.add_argument("--frame-selector", default=default_frame_selector(), help="画面筛选策略（默认 %(default)s）")
     refine.set_defaults(func=cmd_refine)
 
+
+def _add_doctor_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     doctor = sub.add_parser("doctor", help="检查依赖、模型、显卡与密钥")
     doctor.set_defaults(func=cmd_doctor)
 
+
+def _add_config_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     config = sub.add_parser("config", help="显示配置文件位置，或用 --init 生成配置模板")
     config.add_argument("--init", action="store_true", help="在配置目录写入带注释的 config.toml 模板")
     config.add_argument("--force", action="store_true", help="与 --init 一起使用，覆盖已有文件")
     config.set_defaults(func=cmd_config)
 
+
+def _add_worker_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     worker = sub.add_parser("worker", help="作为计算节点连接 Hub，领取转写、画面或整理任务")
     worker.add_argument("--hub", help="Hub 地址，例如 https://course.example.com")
     worker.add_argument("--token", help="节点令牌（也可用环境变量 COURSE2MD_WORKER_TOKEN）")
@@ -532,35 +575,47 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915  历史遗留的
     worker.add_argument("--without", action="append", help="不承担的能力，例如 --without asr，可重复")
     worker.set_defaults(func=cmd_worker)
 
+
+def _add_worker_token_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     token = sub.add_parser("worker-token", help="在 Hub 所在电脑上为计算节点生成令牌")
     token.add_argument("--name", default="计算节点", help="节点名称")
     token.add_argument("--out-dir", help="Hub 的输出目录（数据库位于其中），默认取配置")
     token.set_defaults(func=cmd_worker_token)
 
+
+def _add_server_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     server = sub.add_parser("server", help="以服务器形态启动 Hub（需要登录、按用户隔离，通常放在 HTTPS 反向代理之后）")
     server.add_argument("--host", default="0.0.0.0")
     server.add_argument("--port", type=int, default=8765)
     server.add_argument("--with-node", action="store_true", help="同时在本机启用内置计算节点（单机带算力的服务器使用）")
     server.set_defaults(func=cmd_server)
 
+
+def _add_web_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     web = sub.add_parser("web", help="启动本地图形界面")
     web.add_argument("--host", default="127.0.0.1")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
     web.set_defaults(func=cmd_web)
 
+
+def _add_export_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     export = sub.add_parser("export", help="导出已有课程的 Anki 卡片")
     export.add_argument("source", help="包含 job.json 的课次输出目录")
     export.add_argument("--format", choices=["anki"], default="anki")
     export.add_argument("-o", "--out", required=True, help="TSV 输出文件")
     export.set_defaults(func=cmd_export)
 
+
+def _add_sync_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     sync = sub.add_parser("sync", help="增量同步已有笔记到 Obsidian，保留本地修改")
     sync.add_argument("source", help="课次输出目录")
     sync.add_argument("--vault", required=True, help="Obsidian 仓库路径")
     sync.add_argument("--folder", default="course2md", help="vault 中的子目录")
     sync.set_defaults(func=cmd_sync)
 
+
+def _add_transfer_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     transfer = sub.add_parser("transfer", help="在多个 Hub 间互传课程产物，或离线导出/导入产物包")
     transfer_sub = transfer.add_subparsers(dest="transfer_action", required=True)
 
@@ -599,6 +654,23 @@ def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915  历史遗留的
         "--with-cache", action="store_true", help="同时带上各阶段缓存，目标 Hub 可从整理等中间阶段重新运行"
     )
     t_copy.set_defaults(func=cmd_transfer)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="course2md", description="课程回放 → 结构化 Markdown 笔记")
+    sub = parser.add_subparsers(dest="command", required=True)
+    _add_run_parser(sub)
+    _add_list_parser(sub)
+    _add_refine_parser(sub)
+    _add_doctor_parser(sub)
+    _add_config_parser(sub)
+    _add_worker_parser(sub)
+    _add_worker_token_parser(sub)
+    _add_server_parser(sub)
+    _add_web_parser(sub)
+    _add_export_parser(sub)
+    _add_sync_parser(sub)
+    _add_transfer_parser(sub)
     return parser
 
 

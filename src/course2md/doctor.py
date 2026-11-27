@@ -44,10 +44,9 @@ class Check:
         return BAD if self.fatal else WARN
 
 
-def run_checks() -> list[Check]:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
-    """执行全部检查，返回结果列表。"""
+def _check_config_files() -> list[Check]:
+    """Python 版本、.env、配置文件与环境变量校验。"""
     checks: list[Check] = []
-
     checks.append(Check("Python", sys.version_info >= (3, 10), f"{sys.version.split()[0]}（需要 >=3.10）", fatal=True))
 
     env_file = load_env_file()
@@ -65,7 +64,12 @@ def run_checks() -> list[Check]:  # noqa: PLR0915  历史遗留的长函数，�
         )
     for problem in validate_environment(dict(os.environ)):
         checks.append(Check("配置项", False, problem, fatal=True))
+    return checks
 
+
+def _check_asr_runtime() -> list[Check]:
+    """CUDA 运行库、faster-whisper、转写设备、模型文件与 GPU。"""
+    checks: list[Check] = []
     cuda_dirs = bootstrap_runtime()
     checks.append(
         Check(
@@ -102,13 +106,18 @@ def run_checks() -> list[Check]:  # noqa: PLR0915  历史遗留的长函数，�
             checks.append(Check("GPU", count > 0, f"检测到 {count} 张 CUDA 设备"))
     else:
         checks.append(Check("GPU", True, "使用 CPU，跳过 CUDA 检查"))
+    return checks
 
+
+def _check_llm() -> Check:
     llm = LlmConfig.from_env()
     key = llm.resolved_key()
-    checks.append(
-        Check("大模型", bool(key), f"{llm.base_url} / {llm.model}" + ("" if key else "（未配置 Key，只能转写）"))
-    )
+    return Check("大模型", bool(key), f"{llm.base_url} / {llm.model}" + ("" if key else "（未配置 Key，只能转写）"))
 
+
+def _check_output_dir() -> list[Check]:
+    """输出目录可写性；可写且在 Windows 上时再检查 Agent 沙箱授权。"""
+    checks: list[Check] = []
     out_dir = Path(default_out_dir())
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -131,9 +140,13 @@ def run_checks() -> list[Check]:  # noqa: PLR0915  历史遗留的长函数，�
                 "当前进程可为工作目录授权" if acl_problem is None else f"{acl_problem}。{ACL_HINT}",
             )
         )
+    return checks
 
+
+def _check_resolvers() -> list[Check]:
     from .resolvers import available, load_errors
 
+    checks: list[Check] = []
     resolvers = available()
     names = "、".join(
         f"{info.label}（{info.name}"
@@ -144,7 +157,17 @@ def run_checks() -> list[Check]:  # noqa: PLR0915  历史遗留的长函数，�
     checks.append(Check("来源解析器", True, names))
     for error in load_errors():
         checks.append(Check("解析器插件", False, error))
+    return checks
 
+
+def run_checks() -> list[Check]:
+    """执行全部检查，返回结果列表。"""
+    checks: list[Check] = []
+    checks.extend(_check_config_files())
+    checks.extend(_check_asr_runtime())
+    checks.append(_check_llm())
+    checks.extend(_check_output_dir())
+    checks.extend(_check_resolvers())
     return checks
 
 

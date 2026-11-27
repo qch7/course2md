@@ -287,102 +287,131 @@ class _HubLinkSession:
         else:
             self._log(f"阶段 {task.stage} 已归还给 Hub")
 
-    def _run(self) -> None:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
+    def _run(self) -> None:
         backoff_idx = 0
         while not self._stop.is_set():
-            caps = self._compute_capabilities()
-            work_dir = _default_work_dir(self.config.work_dir, self._default_work_dir)
-            worker = self._factory(
-                self.config,
-                caps,
-                work_dir,
-                self._resources,
-                self._exec_lock,
-                self._on_task_start,
-                self._on_task_end,
-            )
-            with self._lock:
-                self._worker = worker
-                self.capabilities = sorted(caps)
-                if self.status != "reconnecting":
-                    self.status = "connecting"
-
-            try:
-                worker.register()
-            except AuthError as exc:
-                with self._lock:
-                    self._worker = None
-                    self.status = "auth_failed"
-                    self.last_error = str(exc)
-                    self.retry_at = None
-                self._log(f"鉴权失败：{exc}")
+            worker = self._create_worker()
+            registered, backoff_idx = self._register(worker, backoff_idx)
+            if registered is None:
                 return
-            except (HubError, requests.RequestException, OSError) as exc:
-                self._schedule_retry(str(exc), backoff_idx)
-                backoff_idx = min(backoff_idx + 1, len(BACKOFF_SECONDS) - 1)
+            if not registered:
                 continue
-            except Exception as exc:  # noqa: BLE001  后台节点线程边界兜底，避免静默崩溃
-                self._schedule_retry(str(exc) or type(exc).__name__, backoff_idx)
-                backoff_idx = min(backoff_idx + 1, len(BACKOFF_SECONDS) - 1)
-                continue
-
-            now = time.time()
             backoff_idx = 0
-            with self._lock:
-                self.worker_id = worker.worker_id
-                self.status = "online"
-                self.connected_at = now
-                self.last_heartbeat = now
-                self.last_error = ""
-                self.retry_at = None
-            self._log(f"已连接 {self.config.hub_url}（节点 {worker.worker_id}）")
-
-            last_touch = time.monotonic()
-            need_reconnect = False
-            try:
-                while not self._stop.is_set():
-                    try:
-                        if time.monotonic() - last_touch >= HEARTBEAT_INTERVAL:
-                            worker.transport.touch_worker(worker.worker_id)
-                            last_touch = time.monotonic()
-                            with self._lock:
-                                self.last_heartbeat = time.time()
-                        if worker.run_once():
-                            with self._lock:
-                                self.last_heartbeat = time.time()
-                            continue
-                    except AuthError as exc:
-                        with self._lock:
-                            self.status = "auth_failed"
-                            self.last_error = str(exc)
-                            self.retry_at = None
-                        self._log(f"鉴权失效：{exc}")
-                        return
-                    except (HubError, requests.RequestException, OSError) as exc:
-                        need_reconnect = True
-                        self._schedule_retry(str(exc), backoff_idx)
-                        backoff_idx = min(backoff_idx + 1, len(BACKOFF_SECONDS) - 1)
-                        break
-                    except Exception as exc:  # noqa: BLE001  后台节点循环异常时重连，避免线程死亡
-                        need_reconnect = True
-                        self._schedule_retry(str(exc) or type(exc).__name__, backoff_idx)
-                        backoff_idx = min(backoff_idx + 1, len(BACKOFF_SECONDS) - 1)
-                        break
-                    self._stop.wait(worker.poll_interval)
-            finally:
-                if self._stop.is_set() and worker.worker_id:
-                    try:
-                        worker.transport.leave(worker.worker_id)
-                    except Exception:  # noqa: BLE001  离线通知失败时依靠 Hub 心跳超时
-                        pass
-                with self._lock:
-                    self._worker = None
-                    self.current_task = None
-                    if self._stop.is_set():
-                        self.status = "disconnected"
-                        self.retry_at = None
+            self._mark_online(worker)
+            need_reconnect, backoff_idx = self._serve(worker, backoff_idx)
             if not need_reconnect:
                 return
+
+    def _create_worker(self) -> RemoteWorker:
+        """按最新能力与工作目录创建节点，并登记为当前连接。"""
+        caps = self._compute_capabilities()
+        work_dir = _default_work_dir(self.config.work_dir, self._default_work_dir)
+        worker = self._factory(
+            self.config,
+            caps,
+            work_dir,
+            self._resources,
+            self._exec_lock,
+            self._on_task_start,
+            self._on_task_end,
+        )
+        with self._lock:
+            self._worker = worker
+            self.capabilities = sorted(caps)
+            if self.status != "reconnecting":
+                self.status = "connecting"
+        return worker
+
+    def _retry(self, reason: str, backoff_idx: int) -> int:
+        """记录中断并按退避等待，返回下一次的退避档位。"""
+        self._schedule_retry(reason, backoff_idx)
+        return min(backoff_idx + 1, len(BACKOFF_SECONDS) - 1)
+
+    def _register(self, worker: RemoteWorker, backoff_idx: int) -> tuple[bool | None, int]:
+        """向 Hub 注册节点。返回 (结果, 退避档位)：True 成功，False 需重试，None 鉴权失败应终止线程。"""
+        try:
+            worker.register()
+        except AuthError as exc:
+            with self._lock:
+                self._worker = None
+                self.status = "auth_failed"
+                self.last_error = str(exc)
+                self.retry_at = None
+            self._log(f"鉴权失败：{exc}")
+            return None, backoff_idx
+        except (HubError, requests.RequestException, OSError) as exc:
+            return False, self._retry(str(exc), backoff_idx)
+        except Exception as exc:  # noqa: BLE001  后台节点线程边界兜底，避免静默崩溃
+            return False, self._retry(str(exc) or type(exc).__name__, backoff_idx)
+        return True, backoff_idx
+
+    def _mark_online(self, worker: RemoteWorker) -> None:
+        now = time.time()
+        with self._lock:
+            self.worker_id = worker.worker_id
+            self.status = "online"
+            self.connected_at = now
+            self.last_heartbeat = now
+            self.last_error = ""
+            self.retry_at = None
+        self._log(f"已连接 {self.config.hub_url}（节点 {worker.worker_id}）")
+
+    def _poll_once(self, worker: RemoteWorker, last_touch: float) -> tuple[float, bool]:
+        """发送到期的心跳并尝试执行一个任务，返回 (最近心跳时间, 是否执行了任务)。"""
+        if time.monotonic() - last_touch >= HEARTBEAT_INTERVAL:
+            worker.transport.touch_worker(worker.worker_id)
+            last_touch = time.monotonic()
+            with self._lock:
+                self.last_heartbeat = time.time()
+        if worker.run_once():
+            with self._lock:
+                self.last_heartbeat = time.time()
+            return last_touch, True
+        return last_touch, False
+
+    def _serve(self, worker: RemoteWorker, backoff_idx: int) -> tuple[bool, int]:
+        """已注册节点的领取循环。返回 (是否需要重连, 退避档位)；鉴权失效或被停止时不重连。"""
+        last_touch = time.monotonic()
+        need_reconnect = False
+        try:
+            while not self._stop.is_set():
+                try:
+                    last_touch, ran = self._poll_once(worker, last_touch)
+                    if ran:
+                        continue
+                except AuthError as exc:
+                    with self._lock:
+                        self.status = "auth_failed"
+                        self.last_error = str(exc)
+                        self.retry_at = None
+                    self._log(f"鉴权失效：{exc}")
+                    return False, backoff_idx
+                except (HubError, requests.RequestException, OSError) as exc:
+                    need_reconnect = True
+                    backoff_idx = self._retry(str(exc), backoff_idx)
+                    break
+                except Exception as exc:  # noqa: BLE001  后台节点循环异常时重连，避免线程死亡
+                    need_reconnect = True
+                    backoff_idx = self._retry(str(exc) or type(exc).__name__, backoff_idx)
+                    break
+                self._stop.wait(worker.poll_interval)
+        finally:
+            self._leave(worker)
+        return need_reconnect, backoff_idx
+
+    def _leave(self, worker: RemoteWorker) -> None:
+        """循环结束后清理连接状态；若是被主动停止，先通知 Hub 节点下线。"""
+        if self._stop.is_set() and worker.worker_id:
+            try:
+                worker.transport.leave(worker.worker_id)
+            except Exception:  # noqa: BLE001  离线通知失败时依靠 Hub 心跳超时
+                pass
+        with self._lock:
+            self._worker = None
+            self.current_task = None
+            if self._stop.is_set():
+                self.status = "disconnected"
+                self.retry_at = None
 
     def _schedule_retry(self, reason: str, backoff_idx: int) -> None:
         delay = BACKOFF_SECONDS[backoff_idx]
@@ -616,7 +645,55 @@ class HubLinkManager:
             session.start()
         return session.snapshot()
 
-    def update_link(  # noqa: PLR0912  历史遗留的长函数，拆分后移除
+    def _apply_hub_url(self, cfg: HubLinkConfig, hub_url: str) -> bool:
+        """校验并写入新的 Hub 地址，返回是否变化；调用方需持有 self._lock。"""
+        normalized = normalize_hub_url(hub_url)
+        if self._is_self_url(normalized):
+            raise ValueError("不能连接到本机自身地址，请填写其它 Hub 的地址")
+        key = _canonical_url_key(normalized)
+        if any(item.id != cfg.id and _canonical_url_key(item.hub_url) == key for item in self._configs.values()):
+            raise ValueError(f"已经添加过 {normalized}")
+        if normalized == cfg.hub_url:
+            return False
+        cfg.hub_url = normalized
+        return True
+
+    @staticmethod
+    def _apply_link_fields(
+        cfg: HubLinkConfig,
+        *,
+        token: str | None,
+        name: str | None,
+        work_dir: str | None,
+        auto_connect: bool | None,
+        no_agents: bool | None,
+        without: list[str] | None,
+        allow_custom_work_dir: bool,
+    ) -> bool:
+        """写入除地址外的可编辑字段，返回是否有需要重启连接才能生效的变化。"""
+        need_restart = False
+        if token is not None and token.strip() and token.strip() != cfg.token:
+            cfg.token = token.strip()
+            need_restart = True
+        if name is not None and name.strip() != cfg.name:
+            cfg.name = name.strip()
+            need_restart = True
+        if allow_custom_work_dir and work_dir is not None and work_dir.strip() != cfg.work_dir:
+            cfg.work_dir = work_dir.strip()
+            need_restart = True
+        if auto_connect is not None:
+            cfg.auto_connect = bool(auto_connect)
+        if no_agents is not None and bool(no_agents) != cfg.no_agents:
+            cfg.no_agents = bool(no_agents)
+            need_restart = True
+        if without is not None:
+            cleaned = _clean_without(without)
+            if cleaned != cfg.without:
+                cfg.without = cleaned
+                need_restart = True
+        return need_restart
+
+    def update_link(
         self,
         link_id: str,
         *,
@@ -638,36 +715,18 @@ class HubLinkManager:
             need_restart = False
 
             if hub_url is not None:
-                normalized = normalize_hub_url(hub_url)
-                if self._is_self_url(normalized):
-                    raise ValueError("不能连接到本机自身地址，请填写其它 Hub 的地址")
-                key = _canonical_url_key(normalized)
-                if any(
-                    item.id != link_id and _canonical_url_key(item.hub_url) == key for item in self._configs.values()
-                ):
-                    raise ValueError(f"已经添加过 {normalized}")
-                if normalized != cfg.hub_url:
-                    cfg.hub_url = normalized
-                    need_restart = True
-            if token is not None and token.strip() and token.strip() != cfg.token:
-                cfg.token = token.strip()
+                need_restart = self._apply_hub_url(cfg, hub_url)
+            if self._apply_link_fields(
+                cfg,
+                token=token,
+                name=name,
+                work_dir=work_dir,
+                auto_connect=auto_connect,
+                no_agents=no_agents,
+                without=without,
+                allow_custom_work_dir=allow_custom_work_dir,
+            ):
                 need_restart = True
-            if name is not None and name.strip() != cfg.name:
-                cfg.name = name.strip()
-                need_restart = True
-            if allow_custom_work_dir and work_dir is not None and work_dir.strip() != cfg.work_dir:
-                cfg.work_dir = work_dir.strip()
-                need_restart = True
-            if auto_connect is not None:
-                cfg.auto_connect = bool(auto_connect)
-            if no_agents is not None and bool(no_agents) != cfg.no_agents:
-                cfg.no_agents = bool(no_agents)
-                need_restart = True
-            if without is not None:
-                cleaned = _clean_without(without)
-                if cleaned != cfg.without:
-                    cfg.without = cleaned
-                    need_restart = True
             self._save()
 
         if need_restart and was_active:

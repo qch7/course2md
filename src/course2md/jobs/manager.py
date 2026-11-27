@@ -19,7 +19,7 @@ from ..config import (
 )
 from ..core.queue import TaskQueue
 from ..core.versions import NoteVersions
-from ..pipeline import run_job
+from ..pipeline import JobResult, run_job
 from ..resolvers import (
     course_identity,
 )
@@ -27,13 +27,14 @@ from ..stages.executor import QueueExecutor, Suspended
 from ..stages.options import JobOptions
 from ..storage import LocalFileStore
 from .job import ChatRequest, Job, collect_files
-from .records import CourseRecord, CourseView, SessionView
+from .records import CourseRecord, CourseView, MessageRecord, SessionView
 from .serialization import job_from_record, job_to_record
 from .sessions import existing_result
 from .trash import TrashService
 from .workspace_store import WorkspaceStore
 
 if TYPE_CHECKING:
+    from ..refine.conversation import Reply
     from ..worker import LocalNodeManager, WorkerRunner
 
 FORMATS = ("srt", "vtt", "txt", "md", "json")
@@ -289,7 +290,7 @@ class JobManager:
                 if self._runners.get(job_id) is threading.current_thread():
                     self._runners.pop(job_id, None)
 
-    def _run(self, inbox: queue.Queue | None = None) -> None:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
+    def _run(self, inbox: queue.Queue | None = None) -> None:
         while True:
             item = (inbox or self._queue).get()
             if item is None:
@@ -307,36 +308,8 @@ class JobManager:
             job.status = "running"
             job.log("开始执行")
             self.save_job(job)
-
-            def progress(stage: str, fraction: float, message: str, sub: float | None = None, job: Job = job) -> None:
-                with job.locked():
-                    job.stage, job.progress, job.sub, job.message = stage, max(0.0, min(1.0, fraction)), sub, message
-                    scale = sub if sub is not None else job.progress
-                    bucket = (stage, int(scale * 10))
-                    if message and bucket != job._log_bucket:
-                        job._log_bucket = bucket
-                        job.log(f"{stage} · {message}")
-                        self.save_job(job)
-
             try:
-                # 阶段经任务队列交给节点执行；内置 Worker 复用已加载的转写模型。
-                queue = getattr(self, "queue", None)
-                executor = (
-                    QueueExecutor(
-                        queue,
-                        job.id,
-                        reuse=job.reuse,
-                        owner_id=job.owner or None,
-                        run_id=job.run_id,
-                        stop_event=getattr(self, "_closing", None),
-                    )
-                    if queue
-                    else None
-                )
-                result = run_job(options, progress=progress, cancel=job.cancel, on_output=job.emit, executor=executor)
-                job.result = result
-                job.files = collect_files(result)
-                job.revision += 1
+                result = self._execute_pipeline(job, options)
             except Suspended:
                 job.status, job.stage, job.message = "queued", "恢复", "等待服务重启后继续"
                 self.save_job(job)
@@ -344,19 +317,60 @@ class JobManager:
             except Exception as exc:  # noqa: BLE001  产物提取失败由该任务展示，队列继续服务后续课程。
                 self._failure(job, exc)
                 continue
-            job.status, job.progress, job.stage = "done", 1.0, "完成"
-            job.timings = result.timings
-            job.message = "详细版与缩略版已生成" if result.detailed_notes else "转写完成"
-            if "整理" in result.timings:
-                job.message += f"，整理耗时 {result.timings['整理']:.1f} 秒"
-            if result.deleted_media:
-                job.message += f"，已清理 {len(result.deleted_media)} 个下载视频"
-            job.messages.append({"id": uuid.uuid4().hex, "role": "assistant", "text": job.message, "status": "done"})
-            job.log(job.message)
-            for warning in result.warnings:
-                job.log(warning)
-            self.record_version(job, "整理")
-            self.save_job(job)
+            self._finish_pipeline(job, result)
+
+    def _progress_reporter(self, job: Job) -> Callable[..., None]:
+        """生成写回任务进度的回调；日志按（阶段，十分位）去重，避免高频进度刷屏。"""
+
+        def progress(stage: str, fraction: float, message: str, sub: float | None = None) -> None:
+            with job.locked():
+                job.stage, job.progress, job.sub, job.message = stage, max(0.0, min(1.0, fraction)), sub, message
+                scale = sub if sub is not None else job.progress
+                bucket = (stage, int(scale * 10))
+                if message and bucket != job._log_bucket:
+                    job._log_bucket = bucket
+                    job.log(f"{stage} · {message}")
+                    self.save_job(job)
+
+        return progress
+
+    def _execute_pipeline(self, job: Job, options: JobOptions) -> JobResult:
+        """运行流水线并把产物写回任务。"""
+        progress = self._progress_reporter(job)
+        # 阶段经任务队列交给节点执行；内置 Worker 复用已加载的转写模型。
+        task_queue = getattr(self, "queue", None)
+        executor = (
+            QueueExecutor(
+                task_queue,
+                job.id,
+                reuse=job.reuse,
+                owner_id=job.owner or None,
+                run_id=job.run_id,
+                stop_event=getattr(self, "_closing", None),
+            )
+            if task_queue
+            else None
+        )
+        result = run_job(options, progress=progress, cancel=job.cancel, on_output=job.emit, executor=executor)
+        job.result = result
+        job.files = collect_files(result)
+        job.revision += 1
+        return result
+
+    def _finish_pipeline(self, job: Job, result: JobResult) -> None:
+        job.status, job.progress, job.stage = "done", 1.0, "完成"
+        job.timings = result.timings
+        job.message = "详细版与缩略版已生成" if result.detailed_notes else "转写完成"
+        if "整理" in result.timings:
+            job.message += f"，整理耗时 {result.timings['整理']:.1f} 秒"
+        if result.deleted_media:
+            job.message += f"，已清理 {len(result.deleted_media)} 个下载视频"
+        job.messages.append({"id": uuid.uuid4().hex, "role": "assistant", "text": job.message, "status": "done"})
+        job.log(job.message)
+        for warning in result.warnings:
+            job.log(warning)
+        self.record_version(job, "整理")
+        self.save_job(job)
 
     def record_version(self, job: Job, label: str) -> None:
         versions = getattr(self, "versions", None)
@@ -377,12 +391,7 @@ class JobManager:
             job.log(traceback.format_exc(limit=4))
             self.save_job(job)
 
-    def _chat(self, job: Job, request: ChatRequest) -> None:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
-        from ..refine.conversation import continue_notes
-        from ..stages.artifacts import ChatInput
-        from ..stages.base import StageContext
-        from ..stages.chat import ChatStage
-
+    def _chat(self, job: Job, request: ChatRequest) -> None:
         with job.locked():
             job.active_operation = "chat"
             job.pending_messages -= 1
@@ -401,35 +410,9 @@ class JobManager:
             with job.locked():
                 job.status, job.stage, job.message, job.error = "running", "对话", "正在处理你的要求", ""
                 self.save_job(job)
-            if getattr(self, "queue", None):
-                inputs = ChatInput(
-                    job.result.note_workspace,
-                    job.result.detailed_notes,
-                    request.text,
-                    history,
-                    list((job.out_dir / "frames").rglob("*")),
-                )
-                executor = QueueExecutor(
-                    self.queue,
-                    job.id,
-                    owner_id=job.owner or None,
-                    run_id=f"{job.run_id}:{request.id}",
-                    stop_event=getattr(self, "_closing", None),
-                )
-                reply = executor.run(
-                    ChatStage(), StageContext(job.options, cancel=job.cancel, on_output=job.emit), inputs
-                )
-            else:
-                reply = continue_notes(
-                    job.result.note_workspace,
-                    request.text,
-                    history,
-                    job.result.detailed_notes,
-                    job.options.llm,
-                    job.options.agent,
-                    job.emit,
-                    job.cancel,
-                )
+            reply = self._chat_reply(
+                job, request, history, job.result.note_workspace, job.result.detailed_notes, job.options
+            )
             job.files = collect_files(job.result)
             if reply.updated:
                 job.revision += 1
@@ -442,34 +425,85 @@ class JobManager:
             self.save_job(job)
             return
         except Exception as exc:  # noqa: BLE001  本轮错误保留已有笔记，课程保持可用，后续对话仍可重试。
-            with job.locked():
-                cancelled = job.cancel.is_set()
-                text = "本轮对话已取消" if cancelled else str(exc) or type(exc).__name__
-                job.log(text)
-                if not cancelled:
-                    job.log(traceback.format_exc(limit=4))
-                job.cancel.clear()
-                current["status"] = "cancelled" if cancelled else "failed"
-                usable = bool(job.result and job.result.note_workspace)
-                if usable:
-                    job.status, job.stage, job.error = "done", "完成", ""
-                else:
-                    job.status, job.error = ("cancelled" if cancelled else "failed"), text
-                job.message = f"本轮对话未完成：{text}"
-                job.messages.append(
-                    {"id": uuid.uuid4().hex, "role": "assistant", "text": text, "status": current["status"]}
-                )
+            self._chat_failed(job, current, exc)
         else:
-            with job.locked():
-                current["status"] = "done"
-                job.status, job.stage, job.message = "done", "完成", "两版笔记已更新" if reply.updated else "回复完成"
-                job.messages.append(
-                    {
-                        "id": uuid.uuid4().hex,
-                        "role": "assistant",
-                        "text": reply.text,
-                        "status": "done",
-                        "updated": reply.updated,
-                    }
-                )
+            self._chat_succeeded(job, current, reply)
         self.save_job(job)
+
+    def _chat_reply(
+        self,
+        job: Job,
+        request: ChatRequest,
+        history: list[dict[str, str]],
+        workspace: Path,
+        detailed: Path,
+        options: JobOptions,
+    ) -> Reply:
+        """取得本轮回复：有任务队列时作为阶段派发给节点，否则在本进程内直接调用。
+
+        workspace、detailed、options 由调用方校验后传入，避免这里再判空。
+        """
+        from ..refine.conversation import continue_notes
+        from ..stages.artifacts import ChatInput
+        from ..stages.base import StageContext
+        from ..stages.chat import ChatStage
+
+        if getattr(self, "queue", None):
+            inputs = ChatInput(
+                workspace,
+                detailed,
+                request.text,
+                history,
+                list((job.out_dir / "frames").rglob("*")),
+            )
+            executor = QueueExecutor(
+                self.queue,
+                job.id,
+                owner_id=job.owner or None,
+                run_id=f"{job.run_id}:{request.id}",
+                stop_event=getattr(self, "_closing", None),
+            )
+            return executor.run(ChatStage(), StageContext(options, cancel=job.cancel, on_output=job.emit), inputs)
+        return continue_notes(
+            workspace,
+            request.text,
+            history,
+            detailed,
+            options.llm,
+            options.agent,
+            job.emit,
+            job.cancel,
+        )
+
+    def _chat_failed(self, job: Job, current: MessageRecord, exc: Exception) -> None:
+        with job.locked():
+            cancelled = job.cancel.is_set()
+            text = "本轮对话已取消" if cancelled else str(exc) or type(exc).__name__
+            job.log(text)
+            if not cancelled:
+                job.log(traceback.format_exc(limit=4))
+            job.cancel.clear()
+            current["status"] = "cancelled" if cancelled else "failed"
+            usable = bool(job.result and job.result.note_workspace)
+            if usable:
+                job.status, job.stage, job.error = "done", "完成", ""
+            else:
+                job.status, job.error = ("cancelled" if cancelled else "failed"), text
+            job.message = f"本轮对话未完成：{text}"
+            job.messages.append(
+                {"id": uuid.uuid4().hex, "role": "assistant", "text": text, "status": current["status"]}
+            )
+
+    def _chat_succeeded(self, job: Job, current: MessageRecord, reply: Reply) -> None:
+        with job.locked():
+            current["status"] = "done"
+            job.status, job.stage, job.message = "done", "完成", "两版笔记已更新" if reply.updated else "回复完成"
+            job.messages.append(
+                {
+                    "id": uuid.uuid4().hex,
+                    "role": "assistant",
+                    "text": reply.text,
+                    "status": "done",
+                    "updated": reply.updated,
+                }
+            )

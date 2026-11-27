@@ -12,6 +12,7 @@ import time
 import traceback
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from .. import __version__
@@ -48,6 +49,18 @@ class Transport(Protocol):
         cancelled: bool = ...,
         warnings: list[str] | None = ...,
     ) -> None: ...
+
+
+@dataclass
+class _TaskRun:
+    """一次任务执行中执行线程与心跳线程共享的状态。"""
+
+    cancel: threading.Event = field(default_factory=threading.Event)
+    lost: threading.Event = field(default_factory=threading.Event)
+    done: threading.Event = field(default_factory=threading.Event)
+    warnings: list[str] = field(default_factory=list)
+    outcome: str = "completed"
+    error_text: str = ""
 
 
 class WorkerRunner:
@@ -146,30 +159,51 @@ class WorkerRunner:
     def finish(self, task: ClaimedTask, output: Any) -> Any:
         return output
 
-    def execute(self, task: ClaimedTask) -> None:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
+    def execute(self, task: ClaimedTask) -> None:
         self.current = task.id
         if self._on_task_start is not None:
             self._on_task_start(task)
-        cancel = threading.Event()
-        self._current_cancel = cancel
+        run = _TaskRun()
+        self._current_cancel = run.cancel
         if self._stop.is_set():
-            cancel.set()
-        lost = threading.Event()
-        done = threading.Event()
+            run.cancel.set()
+        beat = threading.Thread(target=self._heartbeat, args=(task, run), daemon=True)
+        beat.start()
+        try:
+            self._run_stage(task, run)
+        except Cancelled as exc:
+            self._on_cancelled(task, run, exc)
+        except LeaseLost:
+            run.outcome = "released"
+            run.done.set()
+        except Exception as exc:  # noqa: BLE001  失败原因交给 Hub 展示
+            self._on_failed(task, run, exc)
+        finally:
+            run.done.set()
+            beat.join(timeout=5)
+            self.current = None
+            self._current_cancel = None
+            if self._on_task_end is not None:
+                self._on_task_end(task, run.outcome, run.error_text)
 
-        def heartbeat() -> None:
-            while not done.wait(max(1.0, self.lease_seconds / 3)):
-                try:
-                    if self.transport.renew(task.id, self.worker_id, self.lease_seconds):
-                        cancel.set()
-                    self.transport.touch_worker(self.worker_id)
-                except LeaseLost:
-                    lost.set()
-                    cancel.set()
-                    return
-                except Exception as exc:  # noqa: BLE001  暂时失败，下次再续
-                    print(f"[worker] 续约失败：{exc}")
+    def _heartbeat(self, task: ClaimedTask, run: _TaskRun) -> None:
+        """后台续约租约；Hub 要求取消或租约丢失时通知执行线程。"""
+        while not run.done.wait(max(1.0, self.lease_seconds / 3)):
+            try:
+                if self.transport.renew(task.id, self.worker_id, self.lease_seconds):
+                    run.cancel.set()
+                self.transport.touch_worker(self.worker_id)
+            except LeaseLost:
+                run.lost.set()
+                run.cancel.set()
+                return
+            except Exception as exc:  # noqa: BLE001  暂时失败，下次再续
+                print(f"[worker] 续约失败：{exc}")
 
+    def _make_reporters(
+        self, task: ClaimedTask
+    ) -> tuple[Callable[[str, float, str, float | None], None], Callable[[dict[str, Any]], None]]:
+        """构造进度上报（同一阶段按间隔限流）与事件转发回调。"""
         last: dict[str, Any] = {"time": 0.0, "stage": ""}
 
         def report(stage: str, fraction: float, message: str, sub: float | None = None) -> None:
@@ -188,72 +222,65 @@ class WorkerRunner:
             except Exception:  # noqa: BLE001
                 pass
 
-        beat = threading.Thread(target=heartbeat, daemon=True)
-        beat.start()
-        warnings: list[str] = []
-        outcome = "completed"
-        error_text = ""
+        return report, emit
+
+    def _run_stage(self, task: ClaimedTask, run: _TaskRun) -> None:
+        """准备输入、持互斥锁执行阶段、上传输出；租约已丢失时不再回报。"""
+        report, emit = self._make_reporters(task)
+        payload = self.prepare(task, task.payload)
+        options = options_from_dict(payload["options"])
+        ctx = StageContext(options=options, progress=report, cancel=run.cancel, on_output=emit, warnings=run.warnings)
+        lock = self._exec_lock
+        acquired = False
         try:
-            payload = self.prepare(task, task.payload)
-            options = options_from_dict(payload["options"])
-            ctx = StageContext(options=options, progress=report, cancel=cancel, on_output=emit, warnings=warnings)
-            lock = self._exec_lock
-            acquired = False
-            try:
-                if lock is not None:
-                    while not acquired:
-                        ctx.check()
-                        acquired = lock.acquire(timeout=0.2)
-                stage = create_stage(task.stage, **self.resources)
-                ctx.check()
-                output = stage.run(ctx, decode(payload["inputs"]))
-                self.resources.update(stage.resources())
-            finally:
-                if acquired and lock is not None:
-                    lock.release()
-            output = self.finish(task, output)
+            if lock is not None:
+                while not acquired:
+                    ctx.check()
+                    acquired = lock.acquire(timeout=0.2)
+            stage = create_stage(task.stage, **self.resources)
             ctx.check()
-            if not lost.is_set():
-                self.transport.complete(
-                    task.id, self.worker_id, encode(output), warnings, model=output_model(task.stage, options)
-                )
+            output = stage.run(ctx, decode(payload["inputs"]))
+            self.resources.update(stage.resources())
+        finally:
+            if acquired and lock is not None:
+                lock.release()
+        output = self.finish(task, output)
+        ctx.check()
+        if not run.lost.is_set():
+            self.transport.complete(
+                task.id, self.worker_id, encode(output), run.warnings, model=output_model(task.stage, options)
+            )
+        else:
+            run.outcome = "released"
+
+    def _on_cancelled(self, task: ClaimedTask, run: _TaskRun, exc: Cancelled) -> None:
+        """停机导致的取消交还任务，用户取消则回报为已取消。"""
+        run.outcome = "released" if self._stop.is_set() else "cancelled"
+        run.error_text = str(exc)
+        if not run.lost.is_set():
+            if self._stop.is_set():
+                self.transport.release(task.id, self.worker_id)
             else:
-                outcome = "released"
-        except Cancelled as exc:
-            outcome = "released" if self._stop.is_set() else "cancelled"
-            error_text = str(exc)
-            if not lost.is_set():
+                self.transport.fail(
+                    task.id, self.worker_id, str(exc), "Cancelled", cancelled=True, warnings=run.warnings
+                )
+
+    def _on_failed(self, task: ClaimedTask, run: _TaskRun, exc: Exception) -> None:
+        """停机时交还任务，否则把失败原因回报给 Hub。"""
+        run.outcome = "released" if self._stop.is_set() else "failed"
+        run.error_text = str(exc) or type(exc).__name__
+        traceback.print_exc()
+        if not run.lost.is_set():
+            try:
                 if self._stop.is_set():
                     self.transport.release(task.id, self.worker_id)
                 else:
                     self.transport.fail(
-                        task.id, self.worker_id, str(exc), "Cancelled", cancelled=True, warnings=warnings
+                        task.id,
+                        self.worker_id,
+                        run.error_text,
+                        type(exc).__name__,
+                        warnings=run.warnings,
                     )
-        except LeaseLost:
-            outcome = "released"
-            done.set()
-        except Exception as exc:  # noqa: BLE001  失败原因交给 Hub 展示
-            outcome = "released" if self._stop.is_set() else "failed"
-            error_text = str(exc) or type(exc).__name__
-            traceback.print_exc()
-            if not lost.is_set():
-                try:
-                    if self._stop.is_set():
-                        self.transport.release(task.id, self.worker_id)
-                    else:
-                        self.transport.fail(
-                            task.id,
-                            self.worker_id,
-                            error_text,
-                            type(exc).__name__,
-                            warnings=warnings,
-                        )
-                except LeaseLost:
-                    pass
-        finally:
-            done.set()
-            beat.join(timeout=5)
-            self.current = None
-            self._current_cancel = None
-            if self._on_task_end is not None:
-                self._on_task_end(task, outcome, error_text)
+            except LeaseLost:
+                pass
