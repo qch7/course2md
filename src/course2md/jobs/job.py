@@ -154,7 +154,7 @@ class ConfirmationRequired(Exception):
         self.payload = payload
 
 
-def collect_files(result) -> list[dict[str, str]]:
+def collect_files(result: JobResult) -> list[dict[str, str]]:
     """列出可下载的产物（相对输出目录）。"""
     files: list[dict[str, str]] = []
     for path in sorted(result.output_dir.rglob("*")):

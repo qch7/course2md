@@ -7,6 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
+from test_server_mode import SECRET_SOURCE, hub  # noqa: F401  复用服务器形态的夹具
+from test_server_mode import _job as job_request
+from test_server_mode import _register as register_first_admin
 
 from course2md.core.models import TaskRow
 from course2md.hub import service
@@ -15,9 +18,6 @@ from course2md.resolvers import ResolverError
 from course2md.resolvers.base import SessionInfo
 from course2md.stages.artifacts import SessionList, load_artifact
 from course2md.worker import WorkerRunner
-from test_server_mode import SECRET_SOURCE, hub  # noqa: F401  复用服务器形态的夹具
-from test_server_mode import _job as job_request
-from test_server_mode import _register as register_first_admin
 
 
 @pytest.fixture

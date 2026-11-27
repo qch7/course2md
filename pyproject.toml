@@ -93,7 +93,7 @@ include = ["course2md*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]  # tests 在内，子目录里的测试才能导入 live_server 等公共辅助模块
 addopts = "-m 'not gpu and not network and not agent'"
 markers = [
     "gpu: 需要 CUDA 显卡（COURSE2MD_TEST_GPU=1 时运行：pytest -m gpu）",
@@ -145,6 +145,11 @@ module = [
     "psycopg", "psycopg.*", "cryptography", "cryptography.*", "av", "cv2", "onnxruntime",
 ]
 ignore_missing_imports = true
+
+# 这些包要求完整的类型标注（AGENTS.md：新代码完整标注类型）。其余包逐步纳入，纳入后在这里登记
+[[tool.mypy.overrides]]
+module = ["course2md.core.*", "course2md.stages.*", "course2md.config.*", "course2md.util.*", "course2md.storage.*", "course2md.jobs.*"]
+disallow_untyped_defs = true
 
 # 分层约束：上层可以导入下层，反之不行；同一层用 | 分隔的模块彼此独立。
 # 运行：uv run lint-imports

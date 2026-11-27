@@ -289,7 +289,7 @@ class JobManager:
                 if self._runners.get(job_id) is threading.current_thread():
                     self._runners.pop(job_id, None)
 
-    def _run(self, inbox=None) -> None:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
+    def _run(self, inbox: queue.Queue | None = None) -> None:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
         while True:
             item = (inbox or self._queue).get()
             if item is None:
@@ -308,7 +308,7 @@ class JobManager:
             job.log("开始执行")
             self.save_job(job)
 
-            def progress(stage, fraction, message, sub=None, job=job):
+            def progress(stage: str, fraction: float, message: str, sub: float | None = None, job: Job = job) -> None:
                 with job.locked():
                     job.stage, job.progress, job.sub, job.message = stage, max(0.0, min(1.0, fraction)), sub, message
                     scale = sub if sub is not None else job.progress

@@ -17,14 +17,19 @@ uv run --group docs mkdocs build --strict
 在 `web/` 执行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`。
 修改接口后运行 `pnpm gen:api` 并提交生成文件。
 
+## 测试目录
+
+`tests/` 按被测的包分子目录（`hub`、`jobs`、`stages`、`worker`、`core`、`refine`、`frames`、`asr`、`agents`、`config`、`resolvers`、`export`、`util`），新测试放进对应目录。
+跨包的约定检查（可选依赖、打包、扩展点）留在 `tests/` 根目录。`conftest.py`、`live_server.py`、`fake_resolvers.py`、`stub_agent.py`、`resolver_patch.py` 是公共辅助，子目录里直接 `import` 即可（`pythonpath` 已包含 `tests`）。
+
 ## 真实 PostgreSQL
 
-CI 单独启动 PostgreSQL 17 服务，安装 `server` 依赖并运行 `tests/test_postgres.py`。
+CI 单独启动 PostgreSQL 17 服务，安装 `server` 依赖并运行 `tests/core/test_postgres.py`。
 本地可连接专用测试实例：
 
 ```powershell
 $env:COURSE2MD_TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@127.0.0.1:55432/test_db"
-uv run pytest -q tests/test_postgres.py
+uv run pytest -q tests/core/test_postgres.py
 ```
 
 每个测试创建随机命名的 schema，结束时删除；测试账号需要对应权限。

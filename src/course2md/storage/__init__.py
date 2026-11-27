@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol
 
@@ -165,7 +166,7 @@ class LocalFileStore(StoreMixin):
         os.replace(temp, target)
         return target
 
-    def _commit(self, target: Path, write) -> None:
+    def _commit(self, target: Path, write: Callable[[BinaryIO], object]) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         handle, temp = tempfile.mkstemp(dir=target.parent, prefix=".tmp-")
         try:

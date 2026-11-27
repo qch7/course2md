@@ -9,10 +9,14 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..frame_selectors.api import DEFAULT_SELECTOR
 from .files import ConfigError, config_path, load_config_file, user_config_dir
 from .schema import SETTINGS, validate_environment
+
+if TYPE_CHECKING:
+    from ..agents import AgentConfig
 
 MODEL_REPO = "models--Systran--faster-whisper-{name}"
 DEFAULT_HF_CACHE = "hf-cache"
@@ -191,7 +195,7 @@ class LlmConfig:
         )
 
 
-def default_agent(choice: str | None = None, provider: str | None = None, model: str | None = None):
+def default_agent(choice: str | None = None, provider: str | None = None, model: str | None = None) -> AgentConfig:
     """选择 Agent 并保留环境中的运行参数。None 自动选择，空值或 none 使用内置整理。
 
     provider 与 model 为 None 时读取 COURSE2MD_DSH_* 或 COURSE2MD_CODEX_*，空字符串沿用 CLI 自身配置。

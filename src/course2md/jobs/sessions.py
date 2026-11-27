@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from ..resolvers import (
     view_options,
     week_of,
 )
+from ..resolvers.base import Resolver, SessionInfo
 from ..util.text import safe_name
 from .records import ExistingResult, ResolvedCourse, SessionRecord
 
@@ -23,7 +25,7 @@ _TITLE_DATE = re.compile(r"[ _\-]?(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2}))?
 _TIME_PART = re.compile(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})")
 
 
-def session_folder(session, course: str = "") -> str:
+def session_folder(session: SessionInfo, course: str = "") -> str:
     """课次在课程文件夹下的名字：优先「日期 时-分」，其次标题。"""
     begin = session.meta.get("begin") or session.date or ""
     found = _TIME_PART.search(begin)
@@ -76,7 +78,7 @@ def existing_result(folder: Path) -> ExistingResult | None:
     }
 
 
-def resolver_fields(resolver, source: str) -> dict[str, Any]:
+def resolver_fields(resolver: Resolver, source: str) -> dict[str, Any]:
     """解析器提供给界面的信息：名称、显示名与可选机位。"""
     return {
         "resolver": resolver.name,
@@ -88,7 +90,7 @@ def resolver_fields(resolver, source: str) -> dict[str, Any]:
     }
 
 
-def describe_sessions(sessions, root: Path, configured: str = "") -> ResolvedCourse:
+def describe_sessions(sessions: Sequence[SessionInfo], root: Path, configured: str = "") -> ResolvedCourse:
     hint = next((session.meta.get("term_start") for session in sessions if session.meta.get("term_start")), "")
     term_start, basis = resolve_term_start(
         configured or default_term_start(), hint, [session.date for session in sessions]
