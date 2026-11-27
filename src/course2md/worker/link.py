@@ -8,11 +8,7 @@
 from __future__ import annotations
 
 import hashlib
-import json
-import os
 import platform
-import sys
-import tempfile
 import threading
 import time
 import uuid
@@ -27,6 +23,7 @@ import requests
 
 from ..config import default_worker_dir, env
 from ..core.queue import ClaimedTask
+from ..util.jsonfile import read_json_object, write_json_private
 from .capabilities import detect_capabilities
 from .client import AuthError, HttpTransport, HubError, RemoteWorker
 
@@ -472,13 +469,8 @@ class HubLinkManager:
 
     # ------------------------------------------------------------ 持久化
     def _load(self) -> None:
-        if not self.state_path.is_file():
-            return
-        try:
-            raw = json.loads(self.state_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return
-        if not isinstance(raw, dict):
+        raw = read_json_object(self.state_path)
+        if raw is None:
             return
         self._env_signatures = [str(item) for item in raw.get("env_signatures", []) if item]
         for entry in raw.get("links", []):
@@ -491,23 +483,15 @@ class HubLinkManager:
             self._sessions[cfg.id] = self._make_session(cfg)
 
     def _save(self) -> None:
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "version": 1,
-            "env_signatures": self._env_signatures[-20:],
-            "links": [cfg.to_storage() for cfg in self._configs.values()],
-        }
-        data = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-        fd, tmp_name = tempfile.mkstemp(dir=self.state_path.parent, prefix=".hub-links-", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(data)
-            if sys.platform != "win32":
-                Path(tmp_name).chmod(0o600)
-            os.replace(tmp_name, self.state_path)
-        finally:
-            if Path(tmp_name).exists():
-                Path(tmp_name).unlink(missing_ok=True)
+        write_json_private(
+            self.state_path,
+            {
+                "version": 1,
+                "env_signatures": self._env_signatures[-20:],
+                "links": [cfg.to_storage() for cfg in self._configs.values()],
+            },
+            prefix=".hub-links-",
+        )
 
     def _make_session(self, cfg: HubLinkConfig) -> _HubLinkSession:
         return _HubLinkSession(cfg, self.default_work_dir, self.resources, self.exec_lock, self._factory)
