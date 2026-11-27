@@ -28,6 +28,7 @@ from ..config import LlmConfig
 from ..pipeline import JobResult
 from ..resolvers import public_source
 from ..stages.codec import options_from_dict, options_to_dict
+from ..stages.options import JobOptions
 from ..util.job_refs import from_job_refs, resolve_relative, to_job_refs
 from ..util.text import safe_name
 from .job import ACTIVE_STATUSES, Job, collect_files
@@ -602,7 +603,7 @@ def _sanitize_imported_options(
     *,
     server_mode: bool,
     is_admin: bool,
-):
+) -> JobOptions | None:
     if not isinstance(raw_options, dict):
         return None
     try:

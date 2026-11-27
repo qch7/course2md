@@ -99,7 +99,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --locked --extra server
-      - run: uv run pytest -q tests/test_postgres.py
+      - run: uv run pytest -q tests/core/test_postgres.py
 
   test:
     needs: lint

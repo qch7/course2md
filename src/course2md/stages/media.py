@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from ..asr import audio as audio_mod
 from ..asr.whisper import WhisperBackend
 from ..resolvers import ResolverError, download, get_resolver, public_source
+from ..resolvers.base import MediaRef
 from ..util.text import ensure_dir, hhmmss, safe_name
 from .artifacts import MediaFile, MediaOutput, Transcript
 from .base import BaseStage, StageContext
@@ -74,7 +75,7 @@ class MediaStage(BaseStage[None, MediaOutput]):
                 else:
                     progress("下载", 0.08 + 0.22 * share, f"开始下载 {ref.name}", 0.0)
 
-                    def on_bytes(have: int, total: int, ref=ref, share=share) -> None:
+                    def on_bytes(have: int, total: int, ref: MediaRef = ref, share: float = share) -> None:
                         ratio = min(1.0, have / total) if total else 0.0
                         progress(
                             "下载",
@@ -117,7 +118,7 @@ class MediaStage(BaseStage[None, MediaOutput]):
                     ctx.warn(f"{media.path.name} 音频过短（{duration:.1f}s），跳过")
                     continue
 
-                def on_backend(fraction: float, message: str, base=base, span=span) -> None:
+                def on_backend(fraction: float, message: str, base: float = base, span: float = span) -> None:
                     progress("转写", 0.34 + base * 0.22 + fraction * span * 0.22, message, fraction)
 
                 backend.progress = on_backend

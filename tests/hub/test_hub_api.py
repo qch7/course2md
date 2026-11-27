@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from course2md.hub.app import create_app
 from course2md.jobs import manager as server
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _manager(root: Path):

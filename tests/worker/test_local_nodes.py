@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from test_server_mode import _register as register_first_admin
+from test_server_mode import hub  # noqa: F401  复用服务器形态的夹具
 
 from course2md.hub.app import create_app
 from course2md.jobs import manager as server
-from test_server_mode import _register as register_first_admin
-from test_server_mode import hub  # noqa: F401  复用服务器形态的夹具
 
 
 @pytest.fixture

@@ -6,6 +6,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.engine import Engine
@@ -58,7 +59,7 @@ class Database:
         self.engine.dispose()
 
 
-def _sqlite_pragmas(connection, _record) -> None:
+def _sqlite_pragmas(connection: Any, _record: Any) -> None:
     cursor = connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")

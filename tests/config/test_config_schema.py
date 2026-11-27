@@ -12,7 +12,7 @@ from course2md.config import AsrConfig, LlmConfig, load_config_file, load_env_fi
 from course2md.config.files import GENERATED, ConfigError, read_config_file
 from course2md.config.schema import BY_ENV, SETTINGS
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 # 不属于用户配置的变量：配置文件路径本身、测试开关
 NOT_IN_SCHEMA = {"COURSE2MD_CONFIG", "COURSE2MD_TEST_GPU"}
 

@@ -9,7 +9,7 @@ uv sync --extra asr
 uv run pre-commit install
 ```
 
-- 代码在 `src/course2md/`，测试在 `tests/`。
+- 代码在 `src/course2md/`，测试在 `tests/`，按被测的包分目录（见 [测试](docs/testing.md)）。
 - `uv run pytest -q` 只跑快速测试。需要显卡、外网或真实 DSH / Codex 的测试分别用 `gpu`、`network`、`agent` 标记，默认跳过，用 `-m` 显式开启。
 - `uv run ruff check src tests scripts`、`uv run ruff format src tests scripts`、`uv run mypy`、`uv run lint-imports` 与 CI 一致。
 - 工程结构、分层、扩展点与编码规范见 [AGENTS.md](AGENTS.md)。

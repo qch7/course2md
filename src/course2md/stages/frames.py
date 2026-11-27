@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, ClassVar
 
 from ..resolvers import ResolverError, download, get_resolver
@@ -86,7 +87,7 @@ class FramesStage(BaseStage[list[Transcript], list[FrameSet]]):
         return results
 
 
-def _scaled(ctx: StageContext, base: float, span: float):
+def _scaled(ctx: StageContext, base: float, span: float) -> Callable[[float, str], None]:
     """把单路媒体的抽帧进度换算到整个任务的进度区间。"""
 
     def report(fraction: float, message: str) -> None:
