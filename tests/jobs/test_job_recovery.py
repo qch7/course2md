@@ -6,7 +6,8 @@ from course2md.jobs.job import Job
 from course2md.jobs.manager import JobManager
 from course2md.pipeline import JobResult
 from course2md.stages.base import StageContext
-from course2md.stages.codec import cache_key, options_to_dict
+from course2md.stages.codec import options_to_dict
+from course2md.stages.dispatch import cache_key
 from course2md.stages.executor import QueueExecutor, Suspended
 from course2md.stages.options import JobOptions
 from course2md.stages.output import OutputStage

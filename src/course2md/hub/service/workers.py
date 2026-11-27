@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ...core.accounts import LOCAL_USER, User
 from ...jobs.manager import JobManager
-from .common import NotFound
+from ..access import NotFound
 
 
 def list_workers(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:

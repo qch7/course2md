@@ -18,7 +18,8 @@ from typing import Any, Protocol
 from .. import __version__
 from ..core.queue import ClaimedTask, LeaseLost
 from ..stages.base import Cancelled, StageContext
-from ..stages.codec import decode, encode, options_from_dict, output_model
+from ..stages.codec import decode, encode, options_from_dict
+from ..stages.dispatch import output_model
 from ..stages.registry import create_stage
 
 

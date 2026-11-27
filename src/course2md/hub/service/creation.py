@@ -34,7 +34,9 @@ from ...resolvers import (
 from ...resolvers.base import SessionInfo
 from ...stages.options import JobOptions
 from ...util.text import safe_name
-from .common import Forbidden, get_course, output_root, server_mode
+from ..access import Forbidden, server_mode
+from ..plugins import ensure_ready
+from .common import get_course, output_root
 from .server_config import resolve_frame_selector
 from .sources import check_source, list_sessions, stored_sessions
 
@@ -332,8 +334,6 @@ def _submit_targets(
 
 
 def _create_job_locked(manager: JobManager, body: dict, user: User = LOCAL_USER) -> dict:
-    from ..plugins import ensure_ready
-
     ensure_ready()
     source = (body.get("source") or "").strip()
     if not source:

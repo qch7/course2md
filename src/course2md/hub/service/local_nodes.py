@@ -6,7 +6,7 @@ from typing import Any
 
 from ...core.accounts import LOCAL_USER, User
 from ...jobs.manager import JobManager
-from .common import Forbidden, NotFound
+from ..access import Forbidden, NotFound
 from .workers import require_queue
 
 

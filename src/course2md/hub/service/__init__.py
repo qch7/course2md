@@ -9,19 +9,8 @@
 
 from __future__ import annotations
 
-from .common import (
-    IMAGE_SUFFIXES,
-    Forbidden,
-    NotFound,
-    get_course,
-    get_job,
-    has_local_node,
-    job_file,
-    output_root,
-    request_cancel,
-    server_mode,
-    visible,
-)
+from ..access import Forbidden, NotFound, server_mode
+from .common import IMAGE_SUFFIXES, get_course, get_job, has_local_node, job_file, output_root, request_cancel, visible
 from .course_transfer import (
     create_transfer_peer,
     delete_transfer_peer,

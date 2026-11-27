@@ -106,6 +106,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
   - 子类会按类名自动登记，节点上的失败到 Hub 后还原为同一类型，所以类名在包内必须唯一；
   - 程序缺陷不要包装成业务错误；
   - 只在边界处使用 `except Exception`（插件调用、任务主循环、后台线程），并写 `# noqa: BLE001  原因`。
+- **循环依赖**：不要用函数内导入绕开循环。需要双方都用的东西下沉到更低的模块（例如 `hub/access.py`、`stages/dispatch.py`）；`tests/test_import_order.py` 会从各入口单独导入检查。已知仍保留的循环：`agents.api` 与 `agents.registry`（预设接口与注册表互相引用）、`stages.frames` 对 `media` 的延迟导入。
 - **可选依赖**：`faster_whisper`、`av`、`cv2`、`psycopg`、`cryptography` 只能在函数内导入，保证核心依赖下也能导入模块（见 `tests/test_optional_deps.py`）。
 - **取消**：阶段在每个耗时步骤之间调用 `ctx.check()`，长循环接受 `check_cancel` 回调。
 - **进度**：通过 `ctx.progress(阶段, 总进度, 说明, 子进度)` 汇报，不要直接 `print`。

@@ -12,21 +12,7 @@ from ...core.accounts import LOCAL_USER, User
 from ...jobs.job import Job
 from ...jobs.manager import JobManager
 from ...jobs.records import CourseRecord
-
-
-class NotFound(LookupError):
-    """请求的任务、课程或文件不存在（包括不属于当前用户的）。"""
-
-
-class Forbidden(Exception):
-    """当前用户无权执行该操作。
-
-    不继承 PermissionError：它是 OSError 的子类，会被处理文件错误的 except 子句误吞。
-    """
-
-
-def server_mode(manager: JobManager) -> bool:
-    return getattr(manager, "mode", "local") == "server"
+from ..access import NotFound, server_mode
 
 
 def visible(user: User, owner: str | None) -> bool:

@@ -10,7 +10,8 @@ from ...jobs.job import ACTIVE_STATUSES, Job
 from ...jobs.manager import JobManager
 from ...jobs.records import CourseRecord
 from ...jobs.trash import TRASH_SECONDS
-from .common import NotFound, get_course, get_job, request_cancel, server_mode, visible
+from ..access import NotFound, server_mode
+from .common import get_course, get_job, request_cancel, visible
 
 
 def delete_course(manager: JobManager, course_id: str, user: User = LOCAL_USER) -> dict:

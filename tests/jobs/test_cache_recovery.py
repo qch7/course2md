@@ -8,7 +8,8 @@ from course2md.core import Database, TaskQueue
 from course2md.frames.sampling import Frame
 from course2md.stages.artifacts import FrameSet, Notes, TranscriptFiles
 from course2md.stages.base import StageContext
-from course2md.stages.codec import cache_key, encode, options_to_dict
+from course2md.stages.codec import encode, options_to_dict
+from course2md.stages.dispatch import cache_key
 from course2md.stages.executor import QueueExecutor, _cached_files_exist
 from course2md.stages.options import JobOptions
 from course2md.storage import LocalFileStore

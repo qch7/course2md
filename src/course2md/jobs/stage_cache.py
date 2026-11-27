@@ -18,7 +18,8 @@ from typing import TYPE_CHECKING, Any
 from ..pipeline import JobResult, run_stages
 from ..stages.artifacts import FrameSet, MediaFile, MediaOutput, Notes, Transcript, TranscriptFiles
 from ..stages.base import StageContext
-from ..stages.codec import cache_key, decode, encode, options_to_dict, output_model
+from ..stages.codec import decode, encode, options_to_dict
+from ..stages.dispatch import cache_key, output_model
 from ..stages.registry import PIPELINE_STAGES
 from ..util.job_refs import from_job_refs, to_job_refs
 from ..util.text import safe_name

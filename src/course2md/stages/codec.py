@@ -6,12 +6,9 @@
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..frame_selectors.api import DEFAULT_SELECTOR
-from ..storage import canonical_json
 from .artifacts import ARTIFACT_TYPES, load_artifact
 
 if TYPE_CHECKING:
@@ -60,32 +57,3 @@ def decode(data: Any) -> Any:
     if isinstance(data, dict) and data.get("kind") in ARTIFACT_TYPES:
         return load_artifact(data)
     raise TypeError("无法解码阶段数据")
-
-
-def cache_key(stage: str, options: dict[str, Any], inputs: Any) -> str:
-    """相同阶段、相同输入与相同的相关选项得到相同的键，可复用之前的输出。"""
-    from .registry import STAGE_TYPES
-
-    stage_type = STAGE_TYPES.get(stage)
-    keys = stage_type.cache_options if stage_type else None
-    relevant = {key: value for key, value in options.items() if keys is None or key in keys}
-    # 旧任务缺少策略字段，使用的也是课堂筛选。
-    if relevant.get("frame_selector") == DEFAULT_SELECTOR:
-        relevant.pop("frame_selector")
-    return hashlib.sha256(canonical_json({"stage": stage, "options": relevant, "inputs": inputs})).hexdigest()
-
-
-def requires_for(stage: str, options: JobOptions, inputs: Any = None) -> list[str]:
-    """执行该阶段所需的节点能力，由阶段类声明。"""
-    from .registry import STAGE_TYPES
-
-    stage_type = STAGE_TYPES.get(stage)
-    return list(stage_type.requires(options, inputs)) if stage_type else []
-
-
-def output_model(stage: str, options: JobOptions) -> str:
-    """记录在产物上的生成模型，由阶段类声明。"""
-    from .registry import STAGE_TYPES
-
-    stage_type = STAGE_TYPES.get(stage)
-    return stage_type.model(options) if stage_type else ""

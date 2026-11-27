@@ -18,7 +18,9 @@ from ...jobs.job import ACTIVE_STATUSES, Job
 from ...jobs.manager import JobManager
 from ...jobs.records import CourseView
 from ...stages.registry import PIPELINE_STAGES, STAGE_LABELS
-from .common import Forbidden, NotFound, get_job, job_file, request_cancel, server_mode, visible
+from ..access import Forbidden, NotFound, server_mode
+from ..plugins import ensure_ready
+from .common import get_job, job_file, request_cancel, visible
 
 
 def list_jobs(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
@@ -112,8 +114,6 @@ STAGE_ORDER = PIPELINE_STAGES
 
 def rerun_job(manager: JobManager, job_id: str, body: dict, user: User = LOCAL_USER) -> dict:
     """从指定阶段重新运行，之前阶段在输入与设置不变时复用已有结果。可换整理后端与模型。"""
-    from ..plugins import ensure_ready
-
     ensure_ready()
     job = get_job(manager, job_id, user)
     from_stage = body.get("from_stage") or "organize"

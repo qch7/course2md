@@ -7,7 +7,7 @@ from typing import Any
 
 from ...core.accounts import LOCAL_USER, User
 from ...jobs.manager import JobManager
-from .common import Forbidden, NotFound, server_mode
+from ..access import Forbidden, NotFound, server_mode
 
 
 def _require_hub_links(manager: JobManager, user: User):
