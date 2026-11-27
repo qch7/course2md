@@ -165,7 +165,7 @@ def _serialize_course(course: dict[str, Any] | None, jobs: list[Job]) -> dict[st
     }
 
 
-def export_bundle(
+def export_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     manager: JobManager,
     jobs: list[Job],
     target_path: Path,
@@ -496,7 +496,7 @@ def _rename_dir(src: Path, dst: Path) -> None:
             time.sleep(0.05 * (attempt + 1))
 
 
-def _extract_job_files(
+def _extract_job_files(  # noqa: PLR0912  历史遗留的长函数，拆分后移除
     archive: zipfile.ZipFile,
     key: str,
     file_records: list[dict[str, Any]],
@@ -682,7 +682,7 @@ def _merge_course_session(course: dict[str, Any], job: Job) -> None:
     course["sessions"] = sessions
 
 
-def import_bundle(
+def import_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     manager: JobManager,
     bundle_path: Path,
     *,

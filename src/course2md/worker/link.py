@@ -290,7 +290,7 @@ class _HubLinkSession:
         else:
             self._log(f"阶段 {task.stage} 已归还给 Hub")
 
-    def _run(self) -> None:
+    def _run(self) -> None:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
         backoff_idx = 0
         while not self._stop.is_set():
             caps = self._compute_capabilities()
@@ -632,7 +632,7 @@ class HubLinkManager:
             session.start()
         return session.snapshot()
 
-    def update_link(
+    def update_link(  # noqa: PLR0912  历史遗留的长函数，拆分后移除
         self,
         link_id: str,
         *,

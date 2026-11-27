@@ -676,7 +676,7 @@ class JobManager:
                 if self._runners.get(job_id) is threading.current_thread():
                     self._runners.pop(job_id, None)
 
-    def _run(self, inbox=None) -> None:
+    def _run(self, inbox=None) -> None:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
         while True:
             item = (inbox or self._queue).get()
             if item is None:
@@ -764,7 +764,7 @@ class JobManager:
             job.log(traceback.format_exc(limit=4))
             self.save_job(job)
 
-    def _chat(self, job: Job, request: ChatRequest) -> None:
+    def _chat(self, job: Job, request: ChatRequest) -> None:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
         from ..refine.conversation import continue_notes
         from ..stages.artifacts import ChatInput
         from ..stages.base import StageContext

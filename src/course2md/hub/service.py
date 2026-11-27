@@ -482,7 +482,7 @@ def resolve_source(manager: JobManager, body: dict, user: User = LOCAL_USER) -> 
     return {**snapshot, "course_id": course["id"]}
 
 
-def create_targets(manager: JobManager, body: dict, source: str, root: Path, user: User = LOCAL_USER) -> list[dict]:
+def create_targets(manager: JobManager, body: dict, source: str, root: Path, user: User = LOCAL_USER) -> list[dict]:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     """把请求里的课次展开成「一个课次一个任务」的目标列表。"""
     wanted = body.get("session_ids")
     if isinstance(wanted, list):
@@ -572,7 +572,7 @@ def create_targets(manager: JobManager, body: dict, source: str, root: Path, use
     return targets
 
 
-def _create_job_locked(manager: JobManager, body: dict, user: User = LOCAL_USER) -> dict:
+def _create_job_locked(manager: JobManager, body: dict, user: User = LOCAL_USER) -> dict:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     from .plugins import ensure_ready
 
     ensure_ready()
@@ -1282,7 +1282,7 @@ def remote_catalog(manager: JobManager, body: dict[str, Any], user: User = LOCAL
         return remote.catalog()
 
 
-def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_USER) -> dict[str, Any]:
+def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_USER) -> dict[str, Any]:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
     from ..jobs.bundle import CONFLICT_MODES, export_bundle
     from .transfer import RemoteHubClient
 

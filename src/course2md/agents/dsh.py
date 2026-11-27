@@ -95,7 +95,7 @@ def _electron_env(cmd: list[str]) -> dict[str, str]:
     return {"ELECTRON_RUN_AS_NODE": "1"} if cmd and Path(cmd[0]).name.lower() == "deepseek harness.exe" else {}
 
 
-def parse_dsh_models(dump: str) -> dict:
+def parse_dsh_models(dump: str) -> dict:  # noqa: PLR0912  历史遗留的长函数，拆分后移除
     """从 dsh --dump-config 的输出读取默认提供商与模型，以及 llm-pi-ai 中登记的提供商和模型。"""
     result: dict = {"default_provider": "", "default_model": "", "providers": {}}
     block = ""

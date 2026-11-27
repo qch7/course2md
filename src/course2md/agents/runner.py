@@ -40,7 +40,7 @@ def decode_output(raw: str, preset: AgentPreset | None) -> dict:
     return preset.decode_event(event) or {"kind": "log", "text": text}
 
 
-def execute_agent(
+def execute_agent(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     workspace: Path,
     cfg: AgentConfig,
     progress: Progress,

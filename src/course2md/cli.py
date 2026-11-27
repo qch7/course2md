@@ -141,7 +141,7 @@ def _print_transfer_summary(result: dict) -> None:
         print(f"  - {item.get('title') or ''}（{item.get('reason') or '已跳过'}）")
 
 
-def cmd_transfer(args) -> int:
+def cmd_transfer(args) -> int:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
     import os
     import tempfile
 
@@ -442,7 +442,7 @@ def cmd_web(args) -> int:
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
     asr_env = AsrConfig.from_env()
     llm_env = LlmConfig.from_env()
     parser = argparse.ArgumentParser(prog="course2md", description="课程回放 → 结构化 Markdown 笔记")

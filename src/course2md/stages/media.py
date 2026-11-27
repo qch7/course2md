@@ -51,7 +51,7 @@ class MediaStage(BaseStage[None, MediaOutput]):
     def model(cls, options: JobOptions) -> str:
         return f"faster-whisper {options.asr.model}"
 
-    def run(self, ctx: StageContext, inputs: None = None) -> MediaOutput:
+    def run(self, ctx: StageContext, inputs: None = None) -> MediaOutput:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
         options = ctx.options
         progress = ctx.progress
         media_dir = ensure_dir(options.out_dir / "media")

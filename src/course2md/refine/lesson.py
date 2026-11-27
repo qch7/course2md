@@ -282,7 +282,7 @@ def _render(title: str, lesson: Lesson, figures: dict[str, Frame], evidence: lis
     )
 
 
-def build_note_pair(
+def build_note_pair(  # noqa: PLR0915  历史遗留的长函数，拆分后移除
     segments: list[Segment],
     title: str,
     meta: dict[str, str],

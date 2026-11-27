@@ -66,7 +66,7 @@ def _check_ip(
         )
 
 
-def validate_remote_hub_url(
+def validate_remote_hub_url(  # noqa: PLR0912  历史遗留的长函数，拆分后移除
     raw_url: str,
     *,
     server_mode: bool = False,

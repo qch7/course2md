@@ -44,7 +44,7 @@ class Check:
         return BAD if self.fatal else WARN
 
 
-def run_checks() -> list[Check]:
+def run_checks() -> list[Check]:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
     """执行全部检查，返回结果列表。"""
     checks: list[Check] = []
 

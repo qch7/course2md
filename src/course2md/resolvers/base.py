@@ -147,7 +147,7 @@ class BaseResolver:
         return []
 
 
-def download(media: MediaRef, dest: Path, progress=None, session=None) -> Path:
+def download(media: MediaRef, dest: Path, progress=None, session=None) -> Path:  # noqa: PLR0912  历史遗留的长函数，拆分后移除
     """下载到 .part 后提交。200 覆盖旧分片，206 校验区间，失败保留分片。
 
     progress(已下载字节, 总字节) 可选；session 为 requests.Session，省略时临时创建。
