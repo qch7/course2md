@@ -125,3 +125,14 @@ def test_refine_writes_stage_timings(tmp_path, monkeypatch, backend):
     assert record["timings_seconds"] == {"organize": 3, "total": 5}
     assert output.read_text(encoding="utf-8") == "# 课程笔记\n"
     assert "缩略版" in output.with_name("notes.brief.md").read_text(encoding="utf-8")
+
+
+def test_default_worker_dir_prefers_env_then_cwd(tmp_path, monkeypatch):
+    from course2md.config import default_worker_dir
+
+    monkeypatch.delenv("COURSE2MD_WORKER_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert default_worker_dir() == (tmp_path / "course2md-worker").resolve()
+
+    monkeypatch.setenv("COURSE2MD_WORKER_DIR", str(tmp_path / "elsewhere"))
+    assert default_worker_dir() == (tmp_path / "elsewhere").resolve()

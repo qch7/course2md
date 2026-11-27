@@ -23,6 +23,7 @@ from .config import (
     default_frames,
     default_out_dir,
     default_term_start,
+    default_worker_dir,
     load_settings,
 )
 from .util.text import hhmmss
@@ -392,7 +393,7 @@ def cmd_worker(args) -> int:
         return 2
     capabilities = detect_capabilities(agents=not args.no_agents) | set(args.capability or [])
     capabilities -= set(args.without or [])
-    work_dir = Path(args.work_dir or env("COURSE2MD_WORKER_DIR") or Path.cwd() / "course2md-worker").expanduser()
+    work_dir = Path(args.work_dir).expanduser() if args.work_dir else default_worker_dir()
     worker = RemoteWorker(
         HttpTransport(hub, token), capabilities, work_dir.resolve(), name=args.name or env("COURSE2MD_WORKER_NAME")
     )
