@@ -14,8 +14,8 @@ from course2md.core import Database, TaskQueue
 from course2md.core.models import TaskRow
 from course2md.hub.app import create_app
 from course2md.jobs.manager import JobManager
-from course2md.pipeline import JobOptions
 from course2md.stages.codec import options_to_dict
+from course2md.stages.options import JobOptions
 from course2md.storage import LocalFileStore
 from course2md.worker import WorkerRunner
 from course2md.worker.client import RemoteWorker

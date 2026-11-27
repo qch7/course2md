@@ -50,7 +50,6 @@ from ..jobs.manager import (
     _resolver_fields,
     _session_folder,
 )
-from ..pipeline import JobOptions
 from ..resolvers import (
     ResolverError,
     available,
@@ -63,6 +62,7 @@ from ..resolvers import (
 from ..resolvers.base import SessionInfo
 from ..stages.codec import decode, options_to_dict
 from ..stages.executor import rebuild_task_error
+from ..stages.options import JobOptions
 from ..stages.registry import PIPELINE_STAGES, STAGE_LABELS
 from ..stages.sessions import SessionsStage
 from ..util.text import safe_name

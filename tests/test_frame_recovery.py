@@ -4,10 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from course2md.asr.formats import Segment
-from course2md.pipeline import JobOptions
 from course2md.stages.artifacts import MediaFile, Transcript
 from course2md.stages.base import StageContext
 from course2md.stages.frames import FramesStage
+from course2md.stages.options import JobOptions
 
 
 def test_frames_redownload_missing_media_without_transcribing(tmp_path, monkeypatch):

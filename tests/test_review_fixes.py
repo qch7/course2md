@@ -14,6 +14,7 @@ from course2md import agents as agent
 from course2md.agents import AgentConfig, AgentError, dsh, split_command
 from course2md.asr.formats import Segment
 from course2md.config import AsrConfig, LlmConfig, load_env_file
+from course2md.stages.options import JobOptions
 
 
 def test_tls_verification_is_on_unless_explicitly_disabled(monkeypatch):
@@ -123,7 +124,7 @@ def test_unknown_format_fails_before_any_work(tmp_path, monkeypatch):
 
     monkeypatch.setattr(media_stage, "get_resolver", lambda source: pytest.fail("不应开始解析"))
     with pytest.raises(ValueError, match="docx"):
-        pipeline.run_job(pipeline.JobOptions(source="x.mp4", out_dir=tmp_path, formats=("srt", "docx")))
+        pipeline.run_job(JobOptions(source="x.mp4", out_dir=tmp_path, formats=("srt", "docx")))
 
 
 @pytest.fixture

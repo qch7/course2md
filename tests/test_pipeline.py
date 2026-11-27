@@ -15,6 +15,7 @@ from course2md.refine.lesson import NotePair
 from course2md.resolvers.base import MediaRef
 from course2md.stages import Cancelled
 from course2md.stages import media as media_stage
+from course2md.stages.options import JobOptions
 
 
 @pytest.fixture
@@ -34,7 +35,7 @@ def media_pipeline(tmp_path, monkeypatch):
     monkeypatch.setattr(media_stage, "WhisperBackend", lambda cfg: backend)
     monkeypatch.setattr(media_stage.audio_mod, "prepare", lambda path, wav: (wav, 120))
     monkeypatch.setattr(media_stage.audio_mod, "read_wav", lambda path: [])
-    return pipeline.JobOptions(source="mock", out_dir=tmp_path / "out", proofread=False, frames=False)
+    return JobOptions(source="mock", out_dir=tmp_path / "out", proofread=False, frames=False)
 
 
 def assert_media_outputs(result):
@@ -112,7 +113,7 @@ def test_empty_audio_stops_before_note_generation(tmp_path, monkeypatch):
     monkeypatch.setattr(media_stage.audio_mod, "prepare", lambda path, wav: (wav, 120))
     monkeypatch.setattr(media_stage.audio_mod, "read_wav", lambda path: [])
     with pytest.raises(RuntimeError, match="没有识别到讲话"):
-        pipeline.run_job(pipeline.JobOptions(source="mock", out_dir=tmp_path / "out", frames=False))
+        pipeline.run_job(JobOptions(source="mock", out_dir=tmp_path / "out", frames=False))
 
 
 def test_empty_room_transcript_selects_other_view(media_pipeline, monkeypatch):

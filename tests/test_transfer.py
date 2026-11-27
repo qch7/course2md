@@ -26,7 +26,8 @@ from course2md.hub.app import create_app
 from course2md.hub.transfer import TransferError, TransferPeerStore, validate_remote_hub_url
 from course2md.jobs.bundle import BUNDLE_FORMAT, BUNDLE_VERSION, export_bundle, import_bundle
 from course2md.jobs.manager import Job, JobManager, _collect_files
-from course2md.pipeline import JobOptions, JobResult
+from course2md.pipeline import JobResult
+from course2md.stages.options import JobOptions
 
 
 def _free_port() -> int:

@@ -14,12 +14,12 @@ from course2md.core import Database, TaskQueue
 from course2md.core.versions import NoteVersions
 from course2md.hub.app import create_app
 from course2md.jobs.manager import Job, JobManager
-from course2md.pipeline import JobOptions
 from course2md.resolvers.base import MediaRef
 from course2md.stages import media as media_stage
 from course2md.stages.artifacts import MediaFile, MediaOutput
 from course2md.stages.base import StageContext
 from course2md.stages.cleanup import CleanupStage
+from course2md.stages.options import JobOptions
 from course2md.storage import LocalFileStore
 from course2md.worker.client import RemoteWorker
 
