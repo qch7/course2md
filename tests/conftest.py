@@ -7,6 +7,8 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
+from server_helpers import hub  # noqa: F401  公共夹具：带账号的 Hub，所有测试可直接使用
+
 
 @pytest.fixture
 def sample_course(tmp_path):
