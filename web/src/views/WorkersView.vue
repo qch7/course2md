@@ -6,11 +6,20 @@ import { client, type HubLink, type LocalNode, unwrap, type Worker } from "@/api
 import CapabilityTags from "@/components/CapabilityTags.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import LocalNodeDialog, { type LocalNodeForm } from "@/components/LocalNodeDialog.vue";
-import MeshTopology, { type MeshKind, type MeshNode, type MeshStatus } from "@/components/MeshTopology.vue";
+import MeshTopology, { type MeshKind, type MeshNode } from "@/components/MeshTopology.vue";
 import NodeDetailDialog, { type DetailAction, type DetailTarget } from "@/components/NodeDetailDialog.vue";
 import { isAdmin, session } from "@/stores/session";
 import { showError, toast, ui } from "@/stores/ui";
 import { dateTime } from "@/utils/format";
+import {
+  hubHost,
+  linkDotClass,
+  linkMeshStatus,
+  linkStatusLabels,
+  localNodeStatus,
+  parseWorkerCommand,
+  workerStatus,
+} from "@/utils/mesh";
 
 const workers = useQuery({
   queryKey: ["workers"],
@@ -79,23 +88,6 @@ const outgoingOnlineCount = computed(
 const localNodeDialog = ref<InstanceType<typeof LocalNodeDialog> | null>(null);
 const localNodeBusy = ref(false);
 const selected = ref<{ kind: MeshKind; id: string } | null>(null);
-
-function workerStatus(worker: Worker): MeshStatus {
-  return worker.online ? "on" : "off";
-}
-
-function localNodeStatus(node: LocalNode): MeshStatus {
-  if (!node.enabled || !node.online) return "off";
-  return node.busy ? "busy" : "on";
-}
-
-function linkMeshStatus(status?: string): MeshStatus {
-  if (status === "online") return "on";
-  if (status === "busy") return "busy";
-  if (status === "connecting" || status === "reconnecting") return "warn";
-  if (status === "auth_failed") return "err";
-  return "off";
-}
 
 const meshLocal = computed<MeshNode[]>(() => {
   if (canManageLocalNodes.value) {
@@ -328,50 +320,6 @@ async function handleDetailAction(action: DetailAction): Promise<void> {
   }
   // 节点被删除或停用后详情已无对应对象，关闭弹窗
   if (!detail.value) selected.value = null;
-}
-
-const linkStatusLabels: Record<string, string> = {
-  online: "在线",
-  busy: "执行中",
-  connecting: "连接中…",
-  reconnecting: "重连中…",
-  auth_failed: "令牌失效",
-  disconnected: "未连接",
-};
-
-function linkDotClass(status?: string): string {
-  if (status === "online") return "on";
-  if (status === "busy") return "busy";
-  if (status === "connecting" || status === "reconnecting") return "warn";
-  if (status === "auth_failed") return "err";
-  return "";
-}
-
-function hubHost(url?: string): string {
-  if (!url) return "";
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-}
-
-function parseWorkerCommand(
-  raw: string,
-): { hub_url?: string; token?: string; name?: string; work_dir?: string } | null {
-  if (!raw.includes("--hub") && !raw.includes("--token")) return null;
-  const hubMatch = raw.match(/--hub(?:=|\s+)([^\s"']+|"[^"]+"|'[^']+')/);
-  const tokenMatch = raw.match(/--token(?:=|\s+)([^\s"']+|"[^"]+"|'[^']+')/);
-  if (!hubMatch && !tokenMatch) return null;
-  const unquote = (value?: string) => (value ? value.replace(/^["']|["']$/g, "") : undefined);
-  const nameMatch = raw.match(/--name(?:=|\s+)([^\s"']+|"[^"]+"|'[^']+')/);
-  const dirMatch = raw.match(/--work-dir(?:=|\s+)([^\s"']+|"[^"]+"|'[^']+')/);
-  return {
-    hub_url: unquote(hubMatch?.[1]),
-    token: unquote(tokenMatch?.[1]),
-    name: unquote(nameMatch?.[1]),
-    work_dir: unquote(dirMatch?.[1]),
-  };
 }
 
 function handleHubInput(target: { hub_url: string; token: string; name: string; work_dir: string }): void {

@@ -1,0 +1,69 @@
+/* ------------------------------------------------------------------ 按钮 */
+.primary-button,
+.quiet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-s);
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s,
+    transform 0.25s var(--ease);
+}
+.primary-button {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.primary-button:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+.primary-button:not(:disabled):active,
+.quiet-button:not(:disabled):active,
+.send-button:not(:disabled):active {
+  transform: scale(0.97);
+}
+.primary-button .ui-icon:last-child,
+.resolve-button .ui-icon:last-child {
+  transition: transform 0.3s var(--ease);
+}
+.primary-button:not(:disabled):hover .ui-icon:last-child,
+.resolve-button:not(:disabled):hover .ui-icon:last-child {
+  transform: translateX(2px);
+}
+.quiet-button {
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: var(--surface);
+}
+.quiet-button:not(:disabled):hover {
+  background: var(--hover);
+  text-decoration: none;
+}
+.quiet-button.small {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-radius: var(--radius-s);
+}
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-s);
+  color: var(--muted);
+  font-size: 17px;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+.icon-button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
