@@ -230,9 +230,9 @@ describe("mesh hub links", () => {
     await flushPromises();
   }
 
-  it("renders the mesh strip, outgoing env hub card, and disconnects cleanly", async () => {
+  it("renders the topology legend, outgoing env hub card, and disconnects cleanly", async () => {
     await render();
-    expect(wrapper.find(".mesh-strip").text()).toContain("1 / 1 在线");
+    expect(wrapper.find(".mesh-legend").text()).toContain("1 / 1 在线");
     expect(wrapper.find(".hub-link-card").text()).toContain("course.huaiyu.me");
     expect(wrapper.find(".hub-link-card").text()).toContain("来自 .env");
     const disconnectBtn = wrapper
@@ -274,7 +274,9 @@ describe("mesh hub links", () => {
     session.mode = "server";
     session.user = { id: "alice", username: "Alice", role: "user", disabled: false };
     await render();
-    expect(wrapper.find(".mesh-strip").exists()).toBe(false);
+    expect(wrapper.find(".mesh-legend .kind-external").exists()).toBe(false);
+    expect(wrapper.find(".mesh-vertex.kind-external").exists()).toBe(false);
+    expect(wrapper.find("#section-local-nodes").exists()).toBe(false);
     expect(wrapper.find(".hub-link-card").exists()).toBe(false);
   });
 

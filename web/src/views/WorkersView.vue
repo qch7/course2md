@@ -2,16 +2,26 @@
 import { useQuery } from "@tanstack/vue-query";
 import { computed, reactive, ref } from "vue";
 
-import { client, type HubLink, unwrap, type Worker } from "@/api/client";
+import { client, type HubLink, type LocalNode, unwrap, type Worker } from "@/api/client";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import LocalNodeDialog, { type LocalNodeForm } from "@/components/LocalNodeDialog.vue";
+import MeshTopology, { type MeshKind, type MeshNode, type MeshStatus } from "@/components/MeshTopology.vue";
+import NodeDetailDialog, { type DetailAction, type DetailTarget } from "@/components/NodeDetailDialog.vue";
 import { isAdmin, session } from "@/stores/session";
 import { showError, toast, ui } from "@/stores/ui";
+import { capabilityLabel as label } from "@/utils/capabilities";
 import { dateTime } from "@/utils/format";
 
 const workers = useQuery({
   queryKey: ["workers"],
   queryFn: () => unwrap(client.GET("/api/v1/workers")),
   refetchInterval: 10000,
+});
+const localNodes = useQuery({
+  queryKey: ["local-nodes"],
+  queryFn: () => unwrap(client.GET("/api/v1/local-nodes")),
+  enabled: computed(() => session.mode === "local" || isAdmin()),
+  refetchInterval: 5000,
 });
 const hubLinks = useQuery({
   queryKey: ["hub-links"],
@@ -54,23 +64,271 @@ const editForm = reactive({
 const hubUrl = computed(() => location.origin);
 const canManageLinks = computed(() => Boolean(hubLinks.data.value?.can_manage));
 const outgoingLinks = computed(() => hubLinks.data.value?.links ?? []);
-const incomingWorkers = computed(() => workers.data.value?.workers ?? []);
-const incomingOnlineCount = computed(() => incomingWorkers.value.filter((item) => item.online).length);
+const allWorkers = computed(() => workers.data.value?.workers ?? []);
+// 本机节点由 /local-nodes 管理；拿不到时（普通用户、纯 Hub）退回只读展示进程内节点
+const canManageLocalNodes = computed(() => Boolean(localNodes.data.value?.can_manage));
+const localNodeList = computed<LocalNode[]>(() => localNodes.data.value?.nodes ?? []);
+const availableCapabilities = computed(() => localNodes.data.value?.available_capabilities ?? []);
+const incomingWorkers = computed(() =>
+  canManageLocalNodes.value ? allWorkers.value.filter((item) => item.kind !== "builtin") : allWorkers.value,
+);
 const outgoingOnlineCount = computed(
   () => outgoingLinks.value.filter((item) => item.status === "online" || item.status === "busy").length,
 );
 
-const capabilityNames: Record<string, string> = {
-  asr: "转写",
-  frames: "画面",
-  "frames:decode": "画面解码",
-  "llm-api": "大模型接口",
-  hub: "Hub 本机",
-  node: "独立节点",
-  "agent:dsh": "DSH",
-  "agent:codex": "Codex",
-  "agent:custom": "自定义 Agent",
-};
+const localNodeDialog = ref<InstanceType<typeof LocalNodeDialog> | null>(null);
+const localNodeBusy = ref(false);
+const selected = ref<{ kind: MeshKind; id: string } | null>(null);
+
+function workerStatus(worker: Worker): MeshStatus {
+  return worker.online ? "on" : "off";
+}
+
+function localNodeStatus(node: LocalNode): MeshStatus {
+  if (!node.enabled || !node.online) return "off";
+  return node.busy ? "busy" : "on";
+}
+
+function linkMeshStatus(status?: string): MeshStatus {
+  if (status === "online") return "on";
+  if (status === "busy") return "busy";
+  if (status === "connecting" || status === "reconnecting") return "warn";
+  if (status === "auth_failed") return "err";
+  return "off";
+}
+
+const meshLocal = computed<MeshNode[]>(() => {
+  if (canManageLocalNodes.value) {
+    return localNodeList.value.map((node) => ({
+      id: node.id,
+      kind: "local",
+      label: node.name || node.id,
+      sub: node.enabled ? `${node.capabilities?.length ?? 0} 项能力` : "已停用",
+      status: localNodeStatus(node),
+    }));
+  }
+  return allWorkers.value
+    .filter((worker) => worker.kind === "builtin")
+    .map((worker) => ({
+      id: worker.id,
+      kind: "local",
+      label: worker.name || worker.id,
+      sub: `${worker.capabilities?.length ?? 0} 项能力`,
+      status: workerStatus(worker),
+    }));
+});
+const meshRemote = computed<MeshNode[]>(() =>
+  allWorkers.value
+    .filter((worker) => worker.kind !== "builtin")
+    .map((worker) => ({
+      id: worker.id,
+      kind: "remote",
+      label: worker.name || worker.id,
+      sub: worker.disabled ? "已停用" : `${worker.capabilities?.length ?? 0} 项能力`,
+      status: workerStatus(worker),
+    })),
+);
+const meshExternal = computed<MeshNode[]>(() =>
+  outgoingLinks.value.map((link) => ({
+    id: link.id,
+    kind: "external",
+    label: hubHost(link.hub_url),
+    sub: linkStatusLabels[link.status ?? "disconnected"] ?? link.status,
+    status: linkMeshStatus(link.status),
+  })),
+);
+const meshHub = computed<MeshNode>(() => ({
+  id: "hub",
+  kind: "hub",
+  label: "本机 Hub",
+  sub: hubHost(hubUrl.value),
+  status: "on",
+}));
+const meshAddable = computed(() => ({
+  ...(canManageLocalNodes.value ? { local: "新建节点" } : {}),
+  ...(canManageLinks.value ? { external: "连接 Hub" } : {}),
+  remote: "生成令牌",
+}));
+const meshCounts = computed(() => ({
+  local: {
+    online: meshLocal.value.filter((item) => item.status === "on" || item.status === "busy").length,
+    total: meshLocal.value.length,
+  },
+  remote: {
+    online: meshRemote.value.filter((item) => item.status === "on" || item.status === "busy").length,
+    total: meshRemote.value.length,
+  },
+  external: { online: outgoingOnlineCount.value, total: outgoingLinks.value.length },
+}));
+const selectedKey = computed(() => (selected.value ? `${selected.value.kind}:${selected.value.id}` : ""));
+
+const detail = computed<DetailTarget | null>(() => {
+  const current = selected.value;
+  if (!current) return null;
+  if (current.kind === "hub") {
+    return {
+      kind: "hub",
+      name: "本机 Hub",
+      address: hubUrl.value,
+      mode: session.mode === "server" ? "服务器" : "本地应用",
+      capabilities: canManageLocalNodes.value
+        ? availableCapabilities.value
+        : (hubLinks.data.value?.capabilities ?? []),
+      localOnline: meshCounts.value.local.online,
+      localTotal: meshCounts.value.local.total,
+      remoteOnline: meshCounts.value.remote.online,
+      remoteTotal: meshCounts.value.remote.total,
+      externalOnline: meshCounts.value.external.online,
+      externalTotal: meshCounts.value.external.total,
+    };
+  }
+  if (current.kind === "local") {
+    const node = localNodeList.value.find((item) => item.id === current.id);
+    if (node) return { kind: "local", node, canManage: canManageLocalNodes.value };
+    const worker = allWorkers.value.find((item) => item.id === current.id);
+    if (!worker) return null;
+    return {
+      kind: "local",
+      node: {
+        id: worker.id,
+        name: worker.name,
+        builtin: true,
+        enabled: true,
+        auto: true,
+        selected: [],
+        capabilities: worker.capabilities,
+        online: worker.online,
+        busy: false,
+        created_at: 0,
+      },
+      canManage: false,
+    };
+  }
+  if (current.kind === "remote") {
+    const worker = allWorkers.value.find((item) => item.id === current.id);
+    return worker ? { kind: "remote", worker, canManage: canManage(worker) } : null;
+  }
+  const link = outgoingLinks.value.find((item) => item.id === current.id);
+  return link ? { kind: "external", link, canManage: canManageLinks.value } : null;
+});
+
+function openNode(node: MeshNode): void {
+  selected.value = { kind: node.kind, id: node.id };
+}
+
+function scrollToSection(id: string): void {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function addFromGraph(kind: Exclude<MeshKind, "hub">): void {
+  if (kind === "local") {
+    localNodeDialog.value?.openCreate();
+  } else if (kind === "external") {
+    showAddHub.value = true;
+    scrollToSection("section-external-hubs");
+  } else {
+    scrollToSection("section-add-node");
+  }
+}
+
+async function saveLocalNode(id: string | null, form: LocalNodeForm): Promise<void> {
+  localNodeBusy.value = true;
+  try {
+    const body = {
+      name: form.name.trim(),
+      auto: form.auto,
+      capabilities: form.auto ? [] : form.capabilities,
+      enabled: form.enabled,
+    };
+    if (id) {
+      await unwrap(
+        client.PATCH("/api/v1/local-nodes/{node_id}", { params: { path: { node_id: id } }, body }),
+      );
+      toast("本机节点已更新");
+    } else {
+      await unwrap(client.POST("/api/v1/local-nodes", { body }));
+      toast("本机节点已创建");
+    }
+    localNodeDialog.value?.close();
+    await Promise.all([localNodes.refetch(), workers.refetch()]);
+  } catch (error) {
+    showError(error);
+  } finally {
+    localNodeBusy.value = false;
+  }
+}
+
+async function toggleLocalNode(node: LocalNode): Promise<void> {
+  localNodeBusy.value = true;
+  try {
+    await unwrap(
+      client.PATCH("/api/v1/local-nodes/{node_id}", {
+        params: { path: { node_id: node.id } },
+        body: { enabled: !node.enabled },
+      }),
+    );
+    toast(node.enabled ? "本机节点已停用" : "本机节点已启用");
+    await Promise.all([localNodes.refetch(), workers.refetch()]);
+  } catch (error) {
+    showError(error);
+  } finally {
+    localNodeBusy.value = false;
+  }
+}
+
+async function deleteLocalNode(node: LocalNode): Promise<void> {
+  const confirmed = await confirmation.value?.open({
+    title: "删除本机节点",
+    message: `确定删除本机节点「${node.name || node.id}」？`,
+    detail: "节点配置会被移除；课程、笔记和历史记录会保留。内置节点不能删除。",
+    confirmText: "删除节点",
+  });
+  if (!confirmed) return;
+  localNodeBusy.value = true;
+  try {
+    await unwrap(client.DELETE("/api/v1/local-nodes/{node_id}", { params: { path: { node_id: node.id } } }));
+    if (selected.value?.id === node.id) selected.value = null;
+    toast("本机节点已删除");
+    await Promise.all([localNodes.refetch(), workers.refetch()]);
+  } catch (error) {
+    showError(error);
+  } finally {
+    localNodeBusy.value = false;
+  }
+}
+
+async function handleDetailAction(action: DetailAction): Promise<void> {
+  const target = detail.value;
+  if (action === "add-local") {
+    selected.value = null;
+    localNodeDialog.value?.openCreate();
+    return;
+  }
+  if (!target) return;
+  if (target.kind === "local") {
+    if (action === "edit-local") {
+      selected.value = null;
+      localNodeDialog.value?.openEdit(target.node);
+    } else if (action === "toggle-local") await toggleLocalNode(target.node);
+    else if (action === "delete-local") await deleteLocalNode(target.node);
+  } else if (target.kind === "remote") {
+    const name = target.worker.name || target.worker.id;
+    if (action === "disable-worker") await disable(target.worker.id, name);
+    else if (action === "delete-worker") await remove(target.worker.id, name);
+  } else if (target.kind === "external") {
+    const link = target.link;
+    if (action === "connect-link") await connectLink(link.id);
+    else if (action === "disconnect-link") await disconnectLink(link);
+    else if (action === "delete-link") await deleteLink(link);
+    else if (action === "edit-link") {
+      selected.value = null;
+      startEdit(link);
+      scrollToSection(`link-${link.id}`);
+    }
+  }
+  // 节点被删除或停用后详情已无对应对象，关闭弹窗
+  if (!detail.value) selected.value = null;
+}
 
 const linkStatusLabels: Record<string, string> = {
   online: "在线",
@@ -80,11 +338,6 @@ const linkStatusLabels: Record<string, string> = {
   auth_failed: "令牌失效",
   disconnected: "未连接",
 };
-
-function label(capability: string): string {
-  if (capability.startsWith("resolver:")) return `来源：${capability.slice(9)}`;
-  return capabilityNames[capability] ?? capability;
-}
 
 function linkDotClass(status?: string): string {
   if (status === "online") return "on";
@@ -370,27 +623,92 @@ async function copy(text: string): Promise<void> {
         }}
       </p>
 
-      <section v-if="canManageLinks" class="mesh-strip" aria-label="网状计算概览">
-        <div class="mesh-node">
-          <span class="mesh-label">连入本机</span>
-          <strong>{{ incomingOnlineCount }} / {{ incomingWorkers.length }} 在线</strong>
-          <small class="muted">为本机工作区提供算力</small>
+      <section class="panel mesh-panel" aria-label="网状计算拓扑">
+        <MeshTopology
+          :hub="meshHub"
+          :local="meshLocal"
+          :remote="meshRemote"
+          :external="meshExternal"
+          :addable="meshAddable"
+          :selected-key="selectedKey"
+          @select="openNode"
+          @add="addFromGraph"
+        />
+        <ul class="mesh-legend">
+          <li class="kind-hub">
+            <span class="swatch"></span><strong>本机 Hub</strong><small>调度中心</small>
+          </li>
+          <li class="kind-local">
+            <span class="swatch"></span><strong>本机节点</strong
+            ><small>{{ meshCounts.local.online }} / {{ meshCounts.local.total }} 在线</small>
+          </li>
+          <li class="kind-remote">
+            <span class="swatch"></span><strong>连入的节点</strong
+            ><small>{{ meshCounts.remote.online }} / {{ meshCounts.remote.total }} 在线</small>
+          </li>
+          <li v-if="canManageLinks" class="kind-external">
+            <span class="swatch"></span><strong>外部 Hub</strong
+            ><small>{{ meshCounts.external.online }} / {{ meshCounts.external.total }} 在线</small>
+          </li>
+        </ul>
+        <p class="hint">点击图中的 Hub 或节点查看详情与能力；虚线表示离线，流动的线表示正在执行任务。</p>
+      </section>
+
+      <section v-if="canManageLocalNodes" id="section-local-nodes" class="panel">
+        <div class="panel-head">
+          <h3>本机节点</h3>
+          <button class="quiet-button small" @click="localNodeDialog?.openCreate()">+ 新建本机节点</button>
         </div>
-        <span class="mesh-arrow" aria-hidden="true">⇄</span>
-        <div class="mesh-node mesh-self">
-          <span class="mesh-label">本机节点</span>
-          <strong>{{ hubLinks.data.value?.default_name || "本机" }}</strong>
-          <small class="muted">{{ hubLinks.data.value?.capabilities?.length ?? 0 }} 项可提供能力</small>
-        </div>
-        <span class="mesh-arrow" aria-hidden="true">⇄</span>
-        <div class="mesh-node">
-          <span class="mesh-label">连出到外部 Hub</span>
-          <strong>{{ outgoingOnlineCount }} / {{ outgoingLinks.length }} 在线</strong>
-          <small class="muted">向外提供转写、画面与整理</small>
+        <p class="hint">
+          本机节点和 Hub
+          同进程运行，各自声明承担的能力（例如一个只做转写，一个只做整理）。所有本机节点与外部连接共享显存，一次只执行一个阶段。
+        </p>
+        <div class="worker-list">
+          <article v-for="node in localNodeList" :key="node.id" class="local-node-card">
+            <div class="worker-head">
+              <span class="online" :class="localNodeStatus(node)"></span>
+              <button type="button" class="node-link" @click="selected = { kind: 'local', id: node.id }">
+                {{ node.name || node.id }}
+              </button>
+              <span v-if="node.builtin" class="pill">内置</span>
+              <span class="muted">{{
+                !node.enabled ? "已停用" : node.busy ? "执行中" : node.online ? "在线" : "离线"
+              }}</span>
+              <div class="worker-actions">
+                <button
+                  class="quiet-button small"
+                  :disabled="localNodeBusy"
+                  @click="localNodeDialog?.openEdit(node)"
+                >
+                  编辑
+                </button>
+                <button class="quiet-button small" :disabled="localNodeBusy" @click="toggleLocalNode(node)">
+                  {{ node.enabled ? "停用" : "启用" }}
+                </button>
+                <button
+                  v-if="!node.builtin"
+                  class="quiet-button small"
+                  :disabled="localNodeBusy"
+                  @click="deleteLocalNode(node)"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+            <div class="capabilities">
+              <span v-for="capability in node.capabilities" :key="capability" class="tag">{{
+                label(capability)
+              }}</span>
+              <span v-if="!node.capabilities?.length" class="muted">没有可承担的能力</span>
+            </div>
+            <small class="muted"
+              >{{ node.auto ? "能力自动跟随本机检测" : "能力为手动选择" }} · {{ node.id }}</small
+            >
+          </article>
         </div>
       </section>
 
-      <section v-if="canManageLinks" class="panel">
+      <section v-if="canManageLinks" id="section-external-hubs" class="panel">
         <div class="panel-head">
           <h3>连出到外部 Hub</h3>
           <button class="quiet-button small" @click="showAddHub = !showAddHub">
@@ -403,7 +721,12 @@ async function copy(text: string): Promise<void> {
         </p>
 
         <div v-if="outgoingLinks.length" class="worker-list">
-          <article v-for="link in outgoingLinks" :key="link.id" class="worker-card hub-link-card">
+          <article
+            v-for="link in outgoingLinks"
+            :id="`link-${link.id}`"
+            :key="link.id"
+            class="worker-card hub-link-card"
+          >
             <div class="worker-head">
               <span class="online" :class="linkDotClass(link.status)"></span>
               <a
@@ -639,7 +962,7 @@ async function copy(text: string): Promise<void> {
         </div>
       </section>
 
-      <section class="panel">
+      <section id="section-add-node" class="panel">
         <h3>{{ canManageLinks ? "允许其它节点连入本机" : "添加节点" }}</h3>
         <div class="inline-form">
           <label class="field compact"
@@ -670,4 +993,16 @@ course2md worker --hub {{ hubUrl }} --token {{ created.token }}</pre>
     </div>
   </div>
   <ConfirmDialog ref="confirmation" />
+  <NodeDetailDialog
+    :target="detail"
+    :busy="localNodeBusy || busyLink !== null || removing !== null"
+    @close="selected = null"
+    @action="handleDetailAction"
+  />
+  <LocalNodeDialog
+    ref="localNodeDialog"
+    :available="availableCapabilities"
+    :busy="localNodeBusy"
+    @save="saveLocalNode"
+  />
 </template>

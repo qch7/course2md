@@ -1599,6 +1599,214 @@
         "title": "JobsResponse",
         "type": "object"
       },
+      "LocalNode": {
+        "additionalProperties": true,
+        "properties": {
+          "auto": {
+            "default": true,
+            "title": "Auto",
+            "type": "boolean"
+          },
+          "builtin": {
+            "default": false,
+            "title": "Builtin",
+            "type": "boolean"
+          },
+          "busy": {
+            "default": false,
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "created_at": {
+            "default": 0.0,
+            "title": "Created At",
+            "type": "number"
+          },
+          "current_task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Task"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "online": {
+            "default": false,
+            "title": "Online",
+            "type": "boolean"
+          },
+          "selected": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "LocalNode",
+        "type": "object"
+      },
+      "LocalNodeCreateRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "auto": {
+            "default": false,
+            "description": "随本机检测结果自动获得全部能力；为 true 时忽略 capabilities",
+            "title": "Auto",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "description": "节点承担的能力，只能是本机具备能力的子集",
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "enabled": {
+            "default": true,
+            "description": "创建后立即启用",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "default": "",
+            "description": "节点名称，留空自动编号",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "LocalNodeCreateRequest",
+        "type": "object"
+      },
+      "LocalNodeResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/LocalNode"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "title": "LocalNodeResponse",
+        "type": "object"
+      },
+      "LocalNodeUpdateRequest": {
+        "additionalProperties": true,
+        "properties": {
+          "auto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "是否随本机检测结果自动获得全部能力",
+            "title": "Auto"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "节点承担的能力",
+            "title": "Capabilities"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "停用后节点离线，不再领取任务",
+            "title": "Enabled"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "节点名称",
+            "title": "Name"
+          }
+        },
+        "title": "LocalNodeUpdateRequest",
+        "type": "object"
+      },
+      "LocalNodesResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "available_capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Available Capabilities",
+            "type": "array"
+          },
+          "can_manage": {
+            "default": false,
+            "title": "Can Manage",
+            "type": "boolean"
+          },
+          "nodes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LocalNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "title": "LocalNodesResponse",
+        "type": "object"
+      },
       "LoginResponse": {
         "additionalProperties": true,
         "properties": {
@@ -5056,6 +5264,158 @@
         "summary": "恢复到某个版本（另存为新版本）",
         "tags": [
           "笔记"
+        ]
+      }
+    },
+    "/api/v1/local-nodes": {
+      "get": {
+        "operationId": "list_local_nodes_api_v1_local_nodes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalNodesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "本机节点及其能力",
+        "tags": [
+          "计算服务"
+        ]
+      },
+      "post": {
+        "operationId": "create_local_node_api_v1_local_nodes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalNodeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalNodeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "创建本机节点",
+        "tags": [
+          "计算服务"
+        ]
+      }
+    },
+    "/api/v1/local-nodes/{node_id}": {
+      "delete": {
+        "operationId": "delete_local_node_api_v1_local_nodes__node_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "删除本机节点（内置节点除外）",
+        "tags": [
+          "计算服务"
+        ]
+      },
+      "patch": {
+        "operationId": "update_local_node_api_v1_local_nodes__node_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalNodeUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalNodeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "修改本机节点名称、能力或启停",
+        "tags": [
+          "计算服务"
         ]
       }
     },

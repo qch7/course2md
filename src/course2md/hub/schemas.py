@@ -106,6 +106,20 @@ class HubLinkUpdateRequest(_Body):
     without: list[str] | None = Field(None, description="不向该 Hub 承担的能力列表")
 
 
+class LocalNodeCreateRequest(_Body):
+    name: str = Field("", description="节点名称，留空自动编号")
+    auto: bool = Field(False, description="随本机检测结果自动获得全部能力；为 true 时忽略 capabilities")
+    capabilities: list[str] = Field(default_factory=list, description="节点承担的能力，只能是本机具备能力的子集")
+    enabled: bool = Field(True, description="创建后立即启用")
+
+
+class LocalNodeUpdateRequest(_Body):
+    name: str | None = Field(None, description="节点名称")
+    auto: bool | None = Field(None, description="是否随本机检测结果自动获得全部能力")
+    capabilities: list[str] | None = Field(None, description="节点承担的能力")
+    enabled: bool | None = Field(None, description="停用后节点离线，不再领取任务")
+
+
 class TransferPeerCreateRequest(_Body):
     hub_url: str = Field("", description="对端 Hub 地址，例如 https://course.example.com")
     token: str = Field("", description="对端 Hub 的 API 令牌（本地应用可留空）")
