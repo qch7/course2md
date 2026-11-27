@@ -13,10 +13,11 @@ from urllib.parse import quote
 
 import pytest
 
-from course2md.hub import service
 from course2md.hub.app import create_app
 from course2md.jobs import manager as server
+from course2md.resolvers import ResolverError
 from live_server import LiveServer
+from resolver_patch import patch_get_resolver
 
 
 def _idle_manager(root):
@@ -344,7 +345,7 @@ def _write_result(folder: Path, *, complete: bool) -> None:
 
 
 def test_resolve_reports_course_week_and_existing_results(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     _write_result(web.output / "编译原理" / "2026-11-02 13-30", complete=True)
     _write_result(web.output / "编译原理" / "2026-11-09 15-15", complete=False)
 
@@ -365,7 +366,7 @@ def test_resolve_reports_course_week_and_existing_results(web, monkeypatch):
 
 
 def test_resolve_honours_explicit_term_start(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     status, headers, body = web.request(
         "POST",
         "/api/v1/resolve",
@@ -383,7 +384,7 @@ def test_resolve_honours_explicit_term_start(web, monkeypatch):
 
 
 def test_batch_create_needs_overwrite_confirmation(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     _write_result(web.output / "编译原理" / "2026-11-02 13-30", complete=True)
 
     payload = {
@@ -416,7 +417,7 @@ def test_batch_create_needs_overwrite_confirmation(web, monkeypatch):
 
 
 def test_repeated_create_for_same_session_replaces_completed_job(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     payload = {
         "source": "demo://course",
         "session_ids": ["2"],
@@ -437,7 +438,7 @@ def test_repeated_create_for_same_session_replaces_completed_job(web, monkeypatc
 
 
 def test_running_session_rejects_duplicate_submission(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     payload = {"source": "demo://course", "session_ids": ["2"], "agent": "none", "out_dir": str(web.output)}
     status, headers, body = web.request("POST", "/api/v1/jobs", payload)
     assert status == 200
@@ -449,7 +450,7 @@ def test_running_session_rejects_duplicate_submission(web, monkeypatch):
 
 
 def test_resolved_course_survives_restart_before_any_download(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     status, _, body = web.request(
         "POST",
         "/api/v1/resolve",
@@ -478,7 +479,7 @@ def test_resolved_course_survives_restart_before_any_download(web, monkeypatch):
 
 
 def test_saved_course_refresh_and_continue_with_another_session(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     _, _, body = web.request(
         "POST",
         "/api/v1/jobs",
@@ -496,9 +497,7 @@ def test_saved_course_refresh_and_continue_with_another_session(web, monkeypatch
     from course2md.resolvers import SessionInfo
 
     sessions = [SessionInfo("4", "2026-11-16", "编译原理 2026-11-16 13:30", course="编译原理"), *_demo_sessions()]
-    monkeypatch.setattr(
-        service, "get_resolver", lambda source: SimpleNamespace(name="demo", list_sessions=lambda source: sessions)
-    )
+    patch_get_resolver(monkeypatch, lambda source: SimpleNamespace(name="demo", list_sessions=lambda source: sessions))
     status, _, body = web.request("POST", f"/api/v1/courses/{first['course_id']}/refresh", {})
     assert status == 200
     course = json.loads(body)
@@ -528,10 +527,10 @@ def test_saved_course_refresh_and_continue_with_another_session(web, monkeypatch
 
 
 def test_refresh_failure_keeps_saved_sessions(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     _, _, body = web.request("POST", "/api/v1/resolve", {"source": "demo://course"})
     course_id = json.loads(body)["course_id"]
-    monkeypatch.setattr(service, "get_resolver", Mock(side_effect=service.ResolverError("凭证已过期")))
+    patch_get_resolver(monkeypatch, Mock(side_effect=ResolverError("凭证已过期")))
     status, _, _ = web.request("POST", f"/api/v1/courses/{course_id}/refresh", {})
     assert status == 400
     status, _, body = web.request("GET", f"/api/v1/courses/{course_id}")
@@ -589,7 +588,7 @@ def test_all_job_states_and_custom_output_survive_restart(tmp_path, monkeypatch)
 
 
 def test_replacing_job_also_replaces_persisted_record(web, monkeypatch):
-    monkeypatch.setattr(service, "get_resolver", lambda source: _fake_resolver())
+    patch_get_resolver(monkeypatch, lambda source: _fake_resolver())
     payload = {"source": "demo://course", "session_ids": ["2"], "agent": "none"}
     _, _, body = web.request("POST", "/api/v1/jobs", payload)
     first_id = json.loads(body)["id"]

@@ -33,7 +33,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
 | 层 | 模块 | 职责 |
 |---|---|---|
 | 入口 | `cli` | 命令行 |
-| 接口 | `hub` | FastAPI 应用、`/api/v1`、节点接口、登录；`hub/service.py` 是与 HTTP 无关的业务封装 |
+| 接口 | `hub` | FastAPI 应用、`/api/v1`、节点接口、登录；`hub/service/` 是与 HTTP 无关的业务封装，按领域拆成子模块 |
 | 应用 | `jobs` | 任务与课程生命周期：提交、恢复、对话、版本、持久化 |
 | 节点 | `worker` | 领取并执行阶段任务、能力检测、与 Hub 通信 |
 | 编排 | `pipeline` | 按顺序把阶段交给执行器，写 `job.json` |
@@ -89,7 +89,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
 
 ### 新增 HTTP 接口
 
-路由写在 `hub/api/`，业务逻辑写在 `hub/service.py` 或 `jobs/`，请求与响应模型写在 `hub/schemas.py` 和 `hub/responses.py`。
+路由写在 `hub/api/`，业务逻辑写在 `hub/service/` 下对应领域的子模块（并在其 `__init__.py` 导出）或 `jobs/`，请求与响应模型写在 `hub/schemas.py` 和 `hub/responses.py`。
 改动后导出 OpenAPI，并在 `web/` 重新生成类型。`/api/v1` 的破坏性改动只能进入下一个主版本。
 
 ## 编码规范

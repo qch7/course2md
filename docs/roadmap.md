@@ -88,7 +88,7 @@
 
 ### 1.8 阶段 2：API v1
 
-- `course2md.hub`：FastAPI 应用（`app.py`）、路由（`api/v1.py`）、请求模型（`schemas.py`）、与框架无关的业务逻辑（`service.py`）、本地来源检查中间件（`security.py`）。`http.server` 处理器已删除，`course2md web` 由 uvicorn 提供服务。
+- `course2md.hub`：FastAPI 应用（`app.py`）、路由（`api/v1.py`）、请求模型（`schemas.py`）、与框架无关的业务逻辑（`service/` 包，按领域拆分）、本地来源检查中间件（`security.py`）。`http.server` 处理器已删除，`course2md web` 由 uvicorn 提供服务。
 - 同一组路由挂在 `/api/v1`（写入 OpenAPI）与 `/api`（旧页面使用）；新增 SSE 端点 `/api/v1/jobs/{id}/events`，日志与运行输出增量推送，任务结束后发送 `end` 事件。
 - 错误统一为 `{"error": "中文说明"}`，状态码与旧接口一致（400 / 403 / 404 / 409 / 500）；请求体字段类型保持宽松，取值仍由服务层校验，提示文字不变。
 - OpenAPI：`/api/v1/openapi.json`、Swagger 页面 `/api/docs`；`scripts/export_openapi.py` 导出到 `docs/api/openapi.json`，CI 检查是否最新。

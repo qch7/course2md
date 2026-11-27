@@ -11,9 +11,10 @@ from sqlalchemy import select
 
 from course2md.core.accounts import Accounts, hash_password, verify_password
 from course2md.core.models import CourseRow, JobRow, TaskRow
-from course2md.hub import auth, service
+from course2md.hub import auth
 from course2md.hub.app import create_app
 from course2md.jobs import manager as server
+from resolver_patch import patch_get_resolver
 
 SECRET_SOURCE = "https://classroom.example/play?token=very-secret"
 
@@ -25,9 +26,8 @@ def hub(tmp_path, monkeypatch):
     monkeypatch.setenv("COURSE2MD_OUT_DIR", str(tmp_path / "data"))
     monkeypatch.setattr("course2md.agents.dsh.dsh_prefix", list)
     monkeypatch.setattr("course2md.agents.codex.codex_prefix", list)
-    monkeypatch.setattr(
-        service,
-        "get_resolver",
+    patch_get_resolver(
+        monkeypatch,
         lambda source: SimpleNamespace(
             name="local" if source.endswith(".mp4") else "fakeclass", list_sessions=lambda source: []
         ),
