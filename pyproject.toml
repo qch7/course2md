@@ -73,6 +73,7 @@ dev = [
     "setuptools>=68",
     "wheel>=0.41",
     "import-linter>=2.15",
+    "pytest-cov>=5",
 ]
 docs = ["mkdocs-material>=9.5"]
 
@@ -100,6 +101,20 @@ markers = [
     "network: 访问外部网络",
     "agent: 调用真实的 DSH / Codex CLI",
     "integration: 跨模块或启动子进程的较慢测试",
+]
+
+[tool.coverage.run]
+source = ["course2md"]
+
+[tool.coverage.report]
+# 基线约 87%（Windows、Python 3.12）；下限留出平台差异的余量，只防止覆盖率明显回落
+fail_under = 83
+skip_covered = true
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.$",
 ]
 
 [tool.ruff]

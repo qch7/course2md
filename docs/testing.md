@@ -4,7 +4,7 @@
 
 ```powershell
 uv sync --extra asr --extra server --group docs
-uv run pytest -q
+uv run pytest -q --cov    # 覆盖率下限见 pyproject.toml 的 [tool.coverage.report]
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts
 uv run mypy
