@@ -27,7 +27,7 @@ def course_job(sample_course, tmp_path):
     job = Job("one", "x", "编译原理", course.root, status="done", revision=1)
     job.result = JobResult(course.root, detailed_notes=detailed, brief_notes=brief, note_workspace=course.workspace)
     manager.jobs[job.id] = job
-    manager._save(job)
+    manager.save_job(job)
     yield manager, job
     manager.close()
 
@@ -38,7 +38,7 @@ def test_saved_courses_with_retired_review_fields_still_load(course_job):
     saved.update(review_state={"old-topic": True}, review_revision=1)
     restored = manager._restore_job(saved)
     assert restored.status == "done" and restored.result.detailed_notes.is_file()
-    manager._save(restored)
+    manager.save_job(restored)
     assert "review_state" not in manager.store.load_jobs()[0]
     assert "review_revision" not in manager.store.load_jobs()[0]
 

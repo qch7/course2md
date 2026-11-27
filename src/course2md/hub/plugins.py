@@ -99,7 +99,7 @@ def _mutation(manager, user: User) -> Iterator[None]:
     if not _operation_lock.acquire(blocking=False):
         raise ValueError("已有插件操作正在进行，请稍后再试")
     try:
-        with manager._lock:
+        with manager.locked():
             if any(job.status in ("queued", "running") or job.pending_messages for job in manager.jobs.values()):
                 raise ValueError("课程仍在处理，请等待任务结束后再修改插件")
         yield

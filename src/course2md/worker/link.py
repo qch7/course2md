@@ -462,6 +462,11 @@ class HubLinkManager:
         with self._lock:
             self._local_origins = parsed
 
+    def local_origin_urls(self) -> set[str]:
+        """本机 Hub 的来源（含回环别名）的 URL 形式，用于拒绝把互传或链接指向自己。"""
+        with self._lock:
+            return {f"{scheme}://{host}:{port}" for scheme, host, port in self._local_origins}
+
     def _is_self_url(self, hub_url: str) -> bool:
         return _origin_key(hub_url) in self._local_origins
 

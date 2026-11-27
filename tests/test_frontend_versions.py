@@ -76,9 +76,9 @@ def versioned(tmp_path):
     job = server.Job(id="j", source="x", title="课", out_dir=tmp_path / "out", status="done", owner="local")
     job.result = SimpleNamespace(notes=detailed, detailed_notes=detailed, brief_notes=brief, note_workspace=None)
     manager.jobs["j"] = job
-    manager._record_version(job, "整理")
+    manager.record_version(job, "整理")
     detailed.write_text("# 第二版\n", encoding="utf-8", newline="\n")
-    manager._record_version(job, "对话：改写")
+    manager.record_version(job, "对话：改写")
     client = TestClient(create_app(manager), base_url="http://127.0.0.1:8765")
     return SimpleNamespace(client=client, detailed=detailed, brief=brief, job=job)
 

@@ -180,7 +180,7 @@ def export_anki(job_id: str, request: Request, user: CurrentUser) -> Response:
     from ...export import anki_text
 
     job = service.get_job(_manager(request), job_id, user)
-    with job._lock:
+    with job.locked():
         if not job.result or not job.result.note_workspace:
             raise HTTPException(400, detail="课程尚未生成笔记")
         text = anki_text(job.result.note_workspace)
