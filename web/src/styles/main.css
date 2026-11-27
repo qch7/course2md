@@ -2680,15 +2680,28 @@ legend {
   display: grid;
   gap: 12px;
 }
+.mesh-canvas {
+  position: relative;
+}
 .mesh-topology {
   display: block;
   width: 100%;
   height: auto;
   max-height: 460px;
+  overflow: visible;
 }
 .mesh-vertex {
-  cursor: pointer;
+  cursor: grab;
   outline: none;
+  /* 触屏上由指针事件接管拖动，不再触发页面滚动 */
+  touch-action: none;
+  user-select: none;
+}
+.mesh-vertex.dragging {
+  cursor: grabbing;
+}
+.mesh-vertex.dragging .mesh-shape {
+  filter: drop-shadow(0 4px 8px rgb(0 0 0 / 30%));
 }
 .mesh-shape {
   fill: var(--surface);
