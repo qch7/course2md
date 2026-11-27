@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import os
 import socket
-import sys
 import tempfile
 import threading
 import time
@@ -25,6 +23,7 @@ from ..errors import Course2mdError
 from ..jobs.bundle import CONFLICT_MODES, MAX_BUNDLE_BYTES
 from ..jobs.manager import ACTIVE_STATUSES
 from ..resolvers.base import TLS_HINT, tls_verify
+from ..util.jsonfile import read_json_object, write_json_private
 from ..worker.link import normalize_hub_url, token_hint
 
 _CONNECT_TIMEOUT = 10.0
@@ -153,13 +152,8 @@ class TransferPeerStore:
         self._load()
 
     def _load(self) -> None:
-        if not self.state_path.is_file():
-            return
-        try:
-            raw = json.loads(self.state_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return
-        if not isinstance(raw, dict):
+        raw = read_json_object(self.state_path)
+        if raw is None:
             return
         for entry in raw.get("peers") or []:
             if not isinstance(entry, dict):
@@ -187,7 +181,6 @@ class TransferPeerStore:
             self._peers[peer.id] = peer
 
     def _save(self) -> None:
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
         items = [
             {
                 "id": peer.id,
@@ -199,17 +192,7 @@ class TransferPeerStore:
             }
             for peer in self._peers.values()
         ]
-        payload = json.dumps({"version": 1, "peers": items}, ensure_ascii=False, indent=2) + "\n"
-        fd, tmp_name = tempfile.mkstemp(dir=self.state_path.parent, prefix=".hub-peers-", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(payload)
-            if sys.platform != "win32":
-                Path(tmp_name).chmod(0o600)
-            os.replace(tmp_name, self.state_path)
-        finally:
-            if Path(tmp_name).exists():
-                Path(tmp_name).unlink(missing_ok=True)
+        write_json_private(self.state_path, {"version": 1, "peers": items}, prefix=".hub-peers-")
 
     def list_for(self, owner: str) -> list[dict[str, Any]]:
         with self._lock:

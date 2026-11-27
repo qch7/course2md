@@ -6,10 +6,6 @@
 
 from __future__ import annotations
 
-import json
-import os
-import sys
-import tempfile
 import threading
 import time
 import uuid
@@ -18,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..util.jsonfile import read_json_object, write_json_private
 from .runner import Transport, WorkerRunner
 
 BUILTIN_ID = "builtin"
@@ -92,13 +89,8 @@ class LocalNodeManager:
 
     # ------------------------------------------------------------ 持久化
     def _load(self) -> None:
-        raw: Any = None
-        if self.state_path.is_file():
-            try:
-                raw = json.loads(self.state_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                raw = None
-        entries = raw.get("nodes", []) if isinstance(raw, dict) else []
+        raw = read_json_object(self.state_path)
+        entries = raw.get("nodes", []) if raw is not None else []
         for entry in entries:
             cfg = LocalNodeConfig.from_storage(entry) if isinstance(entry, dict) else None
             if cfg is not None:
@@ -108,18 +100,11 @@ class LocalNodeManager:
             self._configs = {BUILTIN_ID: LocalNodeConfig(id=BUILTIN_ID, name=BUILTIN_NAME), **self._configs}
 
     def _save(self) -> None:
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"version": 1, "nodes": [cfg.to_storage() for cfg in self._configs.values()]}
-        data = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-        fd, tmp_name = tempfile.mkstemp(dir=self.state_path.parent, prefix=".local-nodes-", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(data)
-            if sys.platform != "win32":
-                Path(tmp_name).chmod(0o600)
-            os.replace(tmp_name, self.state_path)
-        finally:
-            Path(tmp_name).unlink(missing_ok=True)
+        write_json_private(
+            self.state_path,
+            {"version": 1, "nodes": [cfg.to_storage() for cfg in self._configs.values()]},
+            prefix=".local-nodes-",
+        )
 
     # ------------------------------------------------------------ 能力
     def available_capabilities(self) -> list[str]:
