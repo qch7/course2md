@@ -1,0 +1,480 @@
+/* ------------------------------------------------------------------ 外壳 */
+.app-shell {
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+.loading-screen {
+  display: grid;
+  place-items: center;
+  height: 100dvh;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+/* 侧栏：比正文更暗一点的纸色，没有硬边框 */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 24px 14px 14px;
+  background: var(--sunken);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 24px;
+  color: var(--ink);
+}
+.brand:hover {
+  text-decoration: none;
+}
+.brand > span:last-child {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+}
+.brand-caption {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+.new-course {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  font-weight: 550;
+  transition: background-color 0.2s;
+}
+.new-course:hover,
+.new-course.active {
+  background: var(--hover);
+}
+.new-course > .ui-icon:first-child {
+  color: var(--accent);
+}
+.new-course-book {
+  margin-left: auto;
+  color: var(--faint);
+  opacity: 0.65;
+}
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  color: var(--faint);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s,
+    color 0.2s;
+}
+.search-box:focus-within {
+  background: var(--paper);
+  border-color: var(--accent-display);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  color: var(--ink);
+}
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  font-size: 13px;
+}
+.sidebar-heading {
+  display: flex;
+  justify-content: space-between;
+  padding: 22px 12px 4px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--faint);
+}
+.course-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+.course-group + .course-group {
+  margin-top: 2px;
+}
+.course-group-heading {
+  display: flex;
+  align-items: center;
+}
+.folder-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 28px;
+  color: var(--faint);
+  font-size: 12px;
+}
+.folder-chevron {
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform 0.3s var(--ease);
+}
+.folder-toggle[aria-expanded="false"] .folder-chevron {
+  transform: rotate(0);
+}
+.course-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  font-weight: 550;
+  text-align: left;
+}
+.course-folder:hover {
+  background: var(--hover);
+}
+.course-folder.selected {
+  background: var(--hover);
+}
+.folder-icon {
+  display: none;
+}
+.folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-count {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--faint);
+}
+.row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.row-actions .quiet-button + .quiet-button {
+  margin-left: 6px;
+}
+.quiet-button.danger {
+  color: var(--danger);
+}
+.folder-delete {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 28px;
+  border-radius: var(--radius-s);
+  color: var(--faint);
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.course-group-heading:hover .folder-delete,
+.folder-delete:focus-visible {
+  opacity: 1;
+}
+.folder-delete:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+@media (hover: none) {
+  /* 触屏没有悬停，常显 */
+  .folder-delete {
+    opacity: 0.7;
+  }
+}
+.course-folder.busy .folder-count {
+  color: var(--accent);
+}
+.course-sessions {
+  display: grid;
+  gap: 1px;
+  min-height: 0;
+  overflow: hidden;
+  padding-left: 22px;
+}
+.course-sessions-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.3s var(--ease-soft),
+    opacity 0.2s;
+}
+.course-sessions-collapse.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.course-item {
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  text-align: left;
+  color: var(--muted);
+}
+.course-item:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.course-item.selected {
+  background: var(--hover);
+  color: var(--ink);
+}
+.course-item .name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+}
+.name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.course-item .info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.course-item.busy .status-dot {
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.course-item.failed .status-dot {
+  background: var(--danger);
+}
+.week-badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 18px;
+}
+.history-empty {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  padding: 22px 12px;
+  color: var(--faint);
+  font-size: 12px;
+}
+.history-empty > .ui-icon {
+  margin-bottom: 4px;
+  opacity: 0.55;
+}
+.history-empty small {
+  font-size: 11px;
+}
+.sidebar-nav {
+  display: grid;
+  gap: 3px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+.sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: var(--radius-s);
+  color: var(--muted);
+  font-size: 13px;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+.sidebar-nav a:hover {
+  background: var(--hover);
+  color: var(--ink);
+  text-decoration: none;
+}
+.sidebar-nav a.router-link-active {
+  background: var(--hover);
+  color: var(--ink);
+}
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0 0 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.workspace-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.workspace-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-family: Georgia, serif;
+  font-size: 16px;
+  background: var(--hover);
+}
+.workspace-identity strong,
+.workspace-identity small {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-identity strong {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+}
+.workspace-identity small {
+  margin-top: 1px;
+  font-size: 10px;
+  color: var(--faint);
+}
+.online-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  vertical-align: 1px;
+}
+.sidebar-scrim {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ 主区 */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--paper);
+}
+.route-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 14px 32px;
+}
+.mobile-menu {
+  display: none;
+}
+.course-heading {
+  flex: 1;
+  min-width: 0;
+}
+.course-heading h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.topbar-note {
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.backend-indicator {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 12px;
+}
+.workspace-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.global-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 24px 0;
+  white-space: pre-line;
+}
+.notice {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.error-notice {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin: 10px 0 4px;
+  cursor: pointer;
+}
+.muted {
+  color: var(--muted);
+}

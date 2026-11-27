@@ -1,0 +1,71 @@
+/* 纸色、墨色与陶土色。用留白和排版组织层次，让内容成为主角。 */
+
+:root {
+  color-scheme: light;
+  --paper: #faf9f5;
+  --surface: #fffefa;
+  --sunken: #f0eee6;
+  --hover: #e7e4db;
+  --ink: #35342e;
+  --muted: #737168;
+  --faint: #827e75;
+  --line: #e8e5dc;
+  --line-strong: #d7d3c8;
+  --accent: #ad573d;
+  --accent-hover: #984b34;
+  --accent-soft: #f2e5dc;
+  --accent-display: #c17b5e;
+  --on-accent: #fffaf6;
+  --success: #3d7a58;
+  --success-soft: #e2efe6;
+  --danger: #b03a2e;
+  --danger-soft: #f8e3df;
+  --shadow: 0 2px 5px rgb(45 40 30 / 3%);
+  --shadow-raised: 0 3px 12px rgb(45 40 30 / 5%), 0 16px 40px rgb(45 40 30 / 4%);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.2, 0.65, 0.3, 1);
+
+  --font-sans:
+    "Inter", "Segoe UI Variable Text", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui,
+    sans-serif;
+  --font-serif:
+    "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STZhongsong", "SimSun", Charter, Georgia, serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "Microsoft YaHei UI", monospace;
+
+  --radius-s: 6px;
+  --radius: 10px;
+  --radius-l: 16px;
+  --column: 800px;
+
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #262624;
+  --surface: #2e2e2b;
+  --sunken: #20201e;
+  --hover: #363630;
+  --ink: #e7e5dc;
+  --muted: #b0ada2;
+  --faint: #99968a;
+  --line: #3b3b34;
+  --line-strong: #505047;
+  --accent: #d99a7e;
+  --accent-hover: #e7ac91;
+  --accent-soft: #42352d;
+  --accent-display: #d99a7e;
+  --on-accent: #25221f;
+  --success: #7cc49c;
+  --success-soft: #1f3328;
+  --danger: #f0907f;
+  --danger-soft: #3d2420;
+  --shadow: 0 2px 5px rgb(0 0 0 / 8%);
+  --shadow-raised: 0 3px 12px rgb(0 0 0 / 12%), 0 16px 40px rgb(0 0 0 / 10%);
+}

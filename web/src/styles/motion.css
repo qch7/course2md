@@ -1,0 +1,84 @@
+/* ------------------------------------------------------------------ 动效 */
+.course-folder,
+.course-item,
+.version-item {
+  transition:
+    color 0.2s,
+    background-color 0.2s;
+}
+.spinning {
+  animation: spin 1s linear infinite;
+}
+.page-enter-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.35s var(--ease);
+}
+.page-leave-active {
+  transition: opacity 0.12s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(5px);
+}
+.page-leave-to {
+  opacity: 0;
+}
+.notice-enter-active,
+.notice-leave-active,
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity 0.2s ease,
+    translate 0.3s var(--ease);
+}
+.notice-enter-from,
+.notice-leave-to,
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  translate: 0 5px;
+}
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes backdrop-in {
+  from {
+    background: transparent;
+    backdrop-filter: blur(0);
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

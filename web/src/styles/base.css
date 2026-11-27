@@ -1,0 +1,219 @@
+/* ------------------------------------------------------------------ 基础 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--paper);
+}
+.ui-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.brand-symbol {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--accent-display);
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+code,
+pre {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+[hidden] {
+  display: none !important;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+::selection {
+  background: var(--accent-soft);
+}
+
+input,
+select,
+textarea {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+}
+input,
+select {
+  min-height: 38px;
+  padding: 7px 11px;
+}
+select {
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%238c8579' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  cursor: pointer;
+}
+select:hover {
+  border-color: var(--faint);
+}
+select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent-display);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+/* 表单控件由边框和阴影提示焦点，避免与全局键盘描边叠加。 */
+input:not([type="checkbox"]):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+/* 原生可定制菜单保留键盘、读屏和视口避让，也能显示在模态框上方。 */
+@supports (appearance: base-select) {
+  select,
+  select::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    display: inline-flex;
+    align-items: center;
+    text-align: start;
+  }
+  select::picker-icon {
+    display: none;
+  }
+  select:open {
+    border-color: var(--accent-display);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  select::picker(select) {
+    position-area: block-end span-inline-end;
+    position-try-fallbacks:
+      flip-block,
+      flip-inline,
+      flip-block flip-inline;
+    position-try-order: normal;
+    margin-block: 6px;
+    padding: 5px;
+    max-block-size: min(280px, 50dvh);
+    overflow-y: auto;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-raised);
+    font: inherit;
+    scrollbar-width: thin;
+  }
+  select option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-block-size: 34px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  select option:checked {
+    background: var(--sunken);
+  }
+  select option:not(:disabled):is(:hover, :focus) {
+    background: var(--hover);
+    outline: none;
+  }
+  select option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: var(--accent);
+  }
+  select option:disabled {
+    color: var(--faint);
+    cursor: default;
+  }
+}
+
+/* 组合输入区把焦点交给外框，内部不再产生可被裁切的描边。 */
+:is(.source-card, .composer, .search-box) :is(input, textarea):focus {
+  outline: none;
+  box-shadow: none;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+textarea {
+  resize: none;
+  line-height: 1.7;
+}

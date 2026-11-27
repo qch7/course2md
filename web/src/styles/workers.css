@@ -1,0 +1,180 @@
+/* ------------------------------------------------------------ 计算服务页：分区与节点卡片 */
+.workers-page {
+  width: min(960px, 100%);
+  gap: 28px;
+}
+.workers-page > .hint {
+  max-width: 68ch;
+}
+.mesh-card {
+  display: grid;
+  gap: 4px;
+  padding: 8px 20px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.mesh-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.mesh-tip {
+  color: var(--faint);
+  font-size: 12px;
+}
+.node-section {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.node-section > .hint {
+  margin-top: -6px;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 600;
+}
+.node-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.25s;
+}
+.node-card:hover {
+  border-color: var(--line-strong);
+}
+.worker-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.node-icon {
+  position: relative;
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--kind, var(--muted)) 14%, transparent);
+}
+.node-icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid var(--kind, var(--muted));
+  border-radius: 5px;
+}
+.node-icon.kind-remote::before {
+  border-radius: 50%;
+}
+.node-icon.kind-external::before {
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+.node-name {
+  flex: 1;
+  min-width: 0;
+}
+.node-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.node-title strong,
+.node-title .node-link,
+.node-title .hub-link-url {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.node-meta {
+  display: block;
+  margin-top: 1px;
+  color: var(--faint);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.worker-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+/* 操作按钮用幽灵样式，平时不抢内容的视线，悬停才出现底色 */
+.worker-actions .quiet-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.worker-actions .quiet-button:not(:disabled):hover {
+  border-color: var(--line);
+  background: var(--hover);
+  color: var(--ink);
+}
+.capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.capabilities .tag {
+  margin: 0;
+  padding: 1px 9px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.capabilities .tag-more {
+  border: 0;
+  color: var(--faint);
+  cursor: pointer;
+}
+.capabilities .tag-more:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.node-empty {
+  padding: 18px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 13px;
+}
+.add-node-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}

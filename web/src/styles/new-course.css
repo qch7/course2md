@@ -1,0 +1,339 @@
+/* ------------------------------------------------------------------ 新建课程 */
+.new-view {
+  display: flex;
+  justify-content: center;
+  padding: clamp(32px, 7vh, 88px) 32px 40px;
+}
+.new-content {
+  display: grid;
+  gap: 16px;
+  width: min(704px, 100%);
+  align-content: start;
+}
+.new-content h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(32px, 3.3vw, 44px);
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -1.8px;
+  text-align: center;
+}
+.new-intro {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  text-align: center;
+  animation: settle-in 0.65s var(--ease) both;
+}
+.welcome-mark {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 8px;
+  transform: rotate(-7deg);
+}
+.brand-rays {
+  transform-origin: 24px 20px;
+  transition: transform 0.6s var(--ease);
+}
+.brand:hover .brand-rays,
+.welcome-mark:hover .brand-rays {
+  transform: translateY(-2px) scale(1.1);
+}
+.intro-eyebrow {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+.intro-description {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.8;
+  text-wrap: balance;
+}
+.course-intro {
+  margin-bottom: 8px;
+}
+.course-intro h2 {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 30px;
+  letter-spacing: -0.6px;
+}
+.has-course {
+  padding-top: 36px;
+}
+.course-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.source-card {
+  display: grid;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-l);
+  box-shadow: 0 4px 16px rgb(45 40 30 / 3%);
+  overflow: hidden;
+  animation: settle-in 0.65s 0.06s var(--ease) both;
+  transition:
+    box-shadow 0.3s,
+    border-color 0.3s;
+}
+.source-card:focus-within {
+  border-color: var(--accent-display);
+  box-shadow:
+    0 0 0 2px var(--accent-soft),
+    var(--shadow);
+}
+.source-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 22px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.source-heading > .ui-icon {
+  color: var(--accent-display);
+}
+.source-format {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 10px;
+}
+.source-card textarea {
+  min-height: 104px;
+  width: 100%;
+  padding: 16px 22px 8px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 14px;
+  border-radius: 0;
+}
+.source-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px 14px 22px;
+  color: var(--faint);
+  font-size: 11px;
+}
+.source-actions .quiet-button {
+  border-color: var(--line);
+  background: var(--sunken);
+}
+.source-submit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.source-shortcut {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--faint);
+}
+.resolve-button {
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+.source-actions .quiet-button:not(:disabled):hover {
+  background: var(--hover);
+}
+.resolve-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.sessions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.bulk-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.selection-count {
+  flex: 1;
+}
+.term-start {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.term-start input {
+  min-height: 30px;
+  padding: 2px 8px;
+}
+.sessions {
+  display: grid;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.sessions:empty {
+  display: none;
+}
+.session-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.session-option + .session-option {
+  border-top: 1px solid var(--line);
+}
+.session-option:hover {
+  background: var(--paper);
+}
+.session-option:has(input:checked) {
+  background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface));
+}
+.session-option:has(input:disabled) {
+  cursor: default;
+  color: var(--muted);
+}
+.session-option input {
+  margin-top: 3px;
+}
+.session-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.session-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 550;
+}
+.session-text small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.existing-badge {
+  margin-left: 6px;
+  font-style: normal;
+  color: var(--success);
+}
+.launch-panel {
+  display: grid;
+  animation: settle-in 0.65s 0.12s var(--ease) both;
+}
+.launch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 14px;
+}
+.launch-row.secondary {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 2px 4px;
+  border-top: 1px solid var(--line);
+}
+.launch-row.secondary .hint {
+  font-size: 11px;
+  max-width: 60%;
+}
+.backend-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.backend-select select {
+  min-width: 138px;
+  min-height: 34px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  background-color: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+.cleanup-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.setting-checks small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.start-button {
+  margin-left: auto;
+  min-height: 36px;
+  gap: 10px;
+  padding: 0 16px;
+  font-size: 12px;
+}
+.options-button {
+  min-height: 34px;
+  padding: 0 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.learning-notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+  padding: 28px 4px 0;
+  border-top: 1px solid var(--line);
+  animation: settle-in 0.7s 0.2s var(--ease) both;
+}
+.learning-notes > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+.learning-notes .ui-icon {
+  margin-bottom: 6px;
+  color: var(--accent-display);
+}
+.learning-notes strong {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 16px;
+}
+.learning-notes p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--faint);
+  text-wrap: balance;
+}
+.new-footnote {
+  margin-top: 28px;
+  color: var(--faint);
+  font-family: var(--font-serif);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-align: center;
+  animation: settle-in 0.7s 0.25s var(--ease) both;
+}
