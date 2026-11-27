@@ -21,7 +21,7 @@ from ..config.schema import TRUE_WORDS
 from ..core.crypto import FieldCipher
 from ..errors import Course2mdError
 from ..jobs.bundle import CONFLICT_MODES, MAX_BUNDLE_BYTES
-from ..jobs.manager import ACTIVE_STATUSES
+from ..jobs.job import ACTIVE_STATUSES
 from ..resolvers.base import TLS_HINT, tls_verify
 from ..util.jsonfile import read_json_object, write_json_private
 from ..worker.link import normalize_hub_url, token_hint

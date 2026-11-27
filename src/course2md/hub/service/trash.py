@@ -6,13 +6,10 @@ import time
 from typing import Any
 
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    ACTIVE_STATUSES,
-    TRASH_SECONDS,
-    Job,
-    JobManager,
-)
+from ...jobs.job import ACTIVE_STATUSES, Job
+from ...jobs.manager import JobManager
 from ...jobs.records import CourseRecord
+from ...jobs.trash import TRASH_SECONDS
 from .common import NotFound, get_course, get_job, request_cancel, server_mode, visible
 
 
@@ -20,14 +17,14 @@ def delete_course(manager: JobManager, course_id: str, user: User = LOCAL_USER) 
     """移入回收站：课程及其全部课次立即从列表消失，进行中的任务先取消；30 天内可恢复。"""
     course = get_course(manager, course_id, user)
     now = time.time()
-    for job in manager.course_jobs(course):
+    for job in manager.trash.course_jobs(course):
         if job.deleted_at is not None:
             continue
         if job.status in ACTIVE_STATUSES:
             request_cancel(manager, job)
             job.log("课程已删除，任务已取消")
-        manager.mark_job_deleted(job, now)
-    manager.mark_course_deleted(course, now)
+        manager.trash.mark_job_deleted(job, now)
+    manager.trash.mark_course_deleted(course, now)
     return {"ok": True}
 
 
@@ -36,7 +33,7 @@ def delete_job(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> dic
     if job.status in ACTIVE_STATUSES:
         request_cancel(manager, job)
         job.log("任务已删除，已取消")
-    manager.mark_job_deleted(job, time.time())
+    manager.trash.mark_job_deleted(job, time.time())
     return {"ok": True}
 
 
@@ -96,12 +93,12 @@ def _trashed(manager: JobManager, kind: str, item_id: str, user: User) -> Job | 
 def restore_trash(manager: JobManager, kind: str, item_id: str, user: User = LOCAL_USER) -> dict:
     item = _trashed(manager, kind, item_id, user)
     if isinstance(item, Job):
-        manager.mark_job_deleted(item, None)
+        manager.trash.mark_job_deleted(item, None)
     else:
-        manager.mark_course_deleted(item, None)
-        for job in manager.course_jobs(item):
+        manager.trash.mark_course_deleted(item, None)
+        for job in manager.trash.course_jobs(item):
             if job.deleted_at is not None:
-                manager.mark_job_deleted(job, None)
+                manager.trash.mark_job_deleted(job, None)
     return {"ok": True}
 
 
@@ -109,7 +106,7 @@ def purge_trash(manager: JobManager, kind: str, item_id: str, user: User = LOCAL
     """立即永久删除，不再等待保留期。"""
     item = _trashed(manager, kind, item_id, user)
     if isinstance(item, Job):
-        manager.purge_job(item)
+        manager.trash.purge_job(item)
     else:
-        manager.purge_course(item)
+        manager.trash.purge_course(item)
     return {"ok": True}

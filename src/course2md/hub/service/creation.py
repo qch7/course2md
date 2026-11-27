@@ -20,17 +20,9 @@ from ...config import (
     default_term_start,
 )
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    ACTIVE_STATUSES,
-    FORMATS,
-    ConfirmationRequired,
-    Job,
-    JobManager,
-    _describe_sessions,
-    _existing_result,
-    _resolver_fields,
-    _session_folder,
-)
+from ...jobs.job import ACTIVE_STATUSES, ConfirmationRequired, Job
+from ...jobs.manager import FORMATS, JobManager
+from ...jobs.sessions import describe_sessions, existing_result, resolver_fields, session_folder
 from ...resolvers import (
     ResolverError,
     get_resolver,
@@ -94,7 +86,7 @@ def create_targets(manager: JobManager, body: dict, source: str, root: Path, use
         day = parse_date(session.date)
         week = week_of(day, term_start) if day and term_start else None
         course = session.course or (body.get("course") or "").strip()
-        folder = root / safe_name(course, "未分类") / safe_name(_session_folder(session, course), "session")
+        folder = root / safe_name(course, "未分类") / safe_name(session_folder(session, course), "session")
         targets.append(
             {
                 "id": uuid.uuid4().hex[:12],
@@ -126,8 +118,8 @@ def create_targets(manager: JobManager, body: dict, source: str, root: Path, use
     if len(set(folders)) != len(folders):
         raise ValueError("选中的课次指向同一个输出目录，请只保留一个")
     resolved = {
-        **_describe_sessions(sessions, root, body.get("term_start", "")),
-        **(_resolver_fields(resolver, source) if resolver_name else {"resolver": ""}),
+        **describe_sessions(sessions, root, body.get("term_start", "")),
+        **(resolver_fields(resolver, source) if resolver_name else {"resolver": ""}),
     }
     if not resolved["course"]:
         resolved["course"] = targets[0]["course"] or targets[0]["title"]
@@ -209,7 +201,7 @@ def _create_job_locked(manager: JobManager, body: dict, user: User = LOCAL_USER)
 
     existing = []
     for target in targets:
-        found = _existing_result(target["folder"])
+        found = existing_result(target["folder"])
         if found:
             existing.append(
                 {

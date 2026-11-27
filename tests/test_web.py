@@ -15,6 +15,8 @@ import pytest
 
 from course2md.hub.app import create_app
 from course2md.jobs import manager as server
+from course2md.jobs.job import ACTIVE_STATUSES, collect_files
+from course2md.jobs.serialization import job_from_record
 from course2md.resolvers import ResolverError
 from live_server import LiveServer
 from resolver_patch import patch_get_resolver
@@ -184,9 +186,7 @@ def test_file_listing_keeps_both_notes_bundle_and_images(web):
     work = web.output / "agent-workspace"
     work.mkdir()
     (work / "agent.log").write_text("internal", encoding="utf-8")
-    files = server._collect_files(
-        JobResult(output_dir=web.output, notes=brief, detailed_notes=detailed, brief_notes=brief)
-    )
+    files = collect_files(JobResult(output_dir=web.output, notes=brief, detailed_notes=detailed, brief_notes=brief))
     assert [item["kind"] for item in files] == ["notes", "notes", "bundle", "image"]
     assert {item["name"] for item in files[:2]} == {detailed.name, brief.name}
 
@@ -266,8 +266,7 @@ def test_followup_queue_is_idempotent_and_survives_restart(tmp_path, monkeypatch
     assert job.messages[-1]["text"] == "已补充。"
     saved = manager.store.load_jobs()
     assert "secret-for-test" not in json.dumps(saved, ensure_ascii=False)
-    restored = _idle_manager(root)
-    recovered = restored._restore_job(next(item for item in saved if item["id"] == "course-one"))
+    recovered = job_from_record(next(item for item in saved if item["id"] == "course-one"))
     assert recovered.snapshot()["can_chat"]
     assert recovered.messages[-1]["text"] == "已补充。"
     assert recovered.revision == 2
@@ -575,7 +574,7 @@ def test_all_job_states_and_custom_output_survive_restart(tmp_path, monkeypatch)
     try:
         assert len(restored.jobs) == 5
         for state, job in restored.jobs.items():
-            assert job.status == ("queued" if state in server.ACTIVE_STATUSES else state)
+            assert job.status == ("queued" if state in ACTIVE_STATUSES else state)
             assert job.session_id == "one"
             assert job.options.ai is False and job.options.delete_video is False
             assert job.files[0]["name"] == "课.srt"

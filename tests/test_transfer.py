@@ -25,7 +25,8 @@ from course2md.hub import service
 from course2md.hub.app import create_app
 from course2md.hub.transfer import TransferError, TransferPeerStore, validate_remote_hub_url
 from course2md.jobs.bundle import BUNDLE_FORMAT, BUNDLE_VERSION, export_bundle, import_bundle
-from course2md.jobs.manager import Job, JobManager, _collect_files
+from course2md.jobs.job import Job, collect_files
+from course2md.jobs.manager import JobManager
 from course2md.pipeline import JobResult
 from course2md.stages.options import JobOptions
 
@@ -212,7 +213,7 @@ def _seed_completed_job(
         options=options,
         result=result,
     )
-    job.files = _collect_files(result)
+    job.files = collect_files(result)
     manager.jobs[job.id] = job
     manager.save_job(job, replace_existing=True)
 

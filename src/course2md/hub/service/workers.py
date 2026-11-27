@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    JobManager,
-)
+from ...jobs.manager import JobManager
 from .common import NotFound
 
 

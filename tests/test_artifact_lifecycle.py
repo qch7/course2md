@@ -13,7 +13,8 @@ from fastapi.testclient import TestClient
 from course2md.core import Database, TaskQueue
 from course2md.core.versions import NoteVersions
 from course2md.hub.app import create_app
-from course2md.jobs.manager import Job, JobManager
+from course2md.jobs.job import Job
+from course2md.jobs.manager import JobManager
 from course2md.resolvers.base import MediaRef
 from course2md.stages import media as media_stage
 from course2md.stages.artifacts import MediaFile, MediaOutput
@@ -84,7 +85,7 @@ def test_head_blob_touches_mtime_to_protect_inflight_upload(tmp_path):
             assert res.status_code == 200
 
         # HEAD 刷新了 mtime，立即执行带宽限期的 GC 不得误删
-        assert manager.prune_objects(grace_seconds=3600) == 0
+        assert manager.trash.prune_objects(grace_seconds=3600) == 0
         assert manager.queue.store.exists(digest)
     finally:
         manager.close()
@@ -207,8 +208,8 @@ def test_purge_job_allows_object_gc(tmp_path):
         digest = manager.queue.complete(tid, "w", {"data": 1})
         assert manager.queue.store.exists(digest)
 
-        manager.purge_job(job)
-        assert manager.prune_objects(grace_seconds=0) >= 1
+        manager.trash.purge_job(job)
+        assert manager.trash.prune_objects(grace_seconds=0) >= 1
         assert not manager.queue.store.exists(digest)
     finally:
         manager.close()

@@ -8,11 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from ...core.accounts import LOCAL_USER, User
-from ...jobs.manager import (
-    ACTIVE_STATUSES,
-    Job,
-    JobManager,
-)
+from ...jobs.job import ACTIVE_STATUSES, Job
+from ...jobs.manager import JobManager
 from ...jobs.records import CourseRecord
 from ...util.text import safe_name
 from .common import NotFound, get_course, get_job, output_root, server_mode, visible

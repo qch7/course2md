@@ -2,7 +2,8 @@
 
 import threading
 
-from course2md.jobs.manager import Job, JobManager
+from course2md.jobs.job import Job
+from course2md.jobs.manager import JobManager
 
 
 def test_shared_creates_once_per_key(tmp_path):

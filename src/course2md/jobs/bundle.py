@@ -30,7 +30,8 @@ from ..resolvers import public_source
 from ..stages.codec import options_from_dict, options_to_dict
 from ..util.job_refs import from_job_refs, resolve_relative, to_job_refs
 from ..util.text import safe_name
-from .manager import ACTIVE_STATUSES, Job, JobManager, _collect_files
+from .job import ACTIVE_STATUSES, Job, collect_files
+from .manager import JobManager
 from .records import CourseRecord, MessageRecord
 from .stage_cache import collect_stage_cache, restore_stage_cache
 
@@ -841,7 +842,7 @@ def import_bundle(  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分�
                 options=options,
                 result=result,
             )
-            job.files = _collect_files(result)
+            job.files = collect_files(result)
             job.log(f"已从{origin_label}导入")
 
             with manager.locked():

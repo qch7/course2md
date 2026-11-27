@@ -12,7 +12,9 @@ from course2md.cli import build_parser
 from course2md.core.accounts import Accounts
 from course2md.export import anki_text, sync_obsidian
 from course2md.hub.app import create_app
-from course2md.jobs.manager import Job, JobManager
+from course2md.jobs.job import Job
+from course2md.jobs.manager import JobManager
+from course2md.jobs.serialization import job_from_record
 from course2md.pipeline import JobResult
 
 
@@ -36,7 +38,7 @@ def test_saved_courses_with_retired_review_fields_still_load(course_job):
     manager, _job = course_job
     saved = manager.store.load_jobs()[0]
     saved.update(review_state={"old-topic": True}, review_revision=1)
-    restored = manager._restore_job(saved)
+    restored = job_from_record(saved)
     assert restored.status == "done" and restored.result.detailed_notes.is_file()
     manager.save_job(restored)
     assert "review_state" not in manager.store.load_jobs()[0]

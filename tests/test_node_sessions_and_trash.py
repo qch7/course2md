@@ -276,7 +276,7 @@ def test_deleting_cancels_running_jobs_and_they_are_not_purged_while_active(hub)
     job.status = "running"
     assert admin.delete(f"/api/v1/jobs/{job.id}").status_code == 200
     assert job.cancel.is_set()
-    assert hub.manager.purge_deleted(now=time.time() + 40 * 86400) == 0 and job.id in hub.manager.jobs
+    assert hub.manager.trash.purge_deleted(now=time.time() + 40 * 86400) == 0 and job.id in hub.manager.jobs
 
 
 def test_expired_trash_is_purged_with_its_files_on_the_server(hub):  # noqa: F811
@@ -286,8 +286,8 @@ def test_expired_trash_is_purged_with_its_files_on_the_server(hub):  # noqa: F81
     folder = job.out_dir
     now = time.time()
     admin.delete(f"/api/v1/courses/{course['id']}")
-    assert hub.manager.purge_deleted(now=now + 29 * 86400) == 0 and folder.is_dir()
-    assert hub.manager.purge_deleted(now=now + 31 * 86400) == 1
+    assert hub.manager.trash.purge_deleted(now=now + 29 * 86400) == 0 and folder.is_dir()
+    assert hub.manager.trash.purge_deleted(now=now + 31 * 86400) == 1
     assert not folder.exists() and not folder.parent.exists()  # 课程文件夹变空后一并清理
     assert (hub.data / "users" / owner).is_dir()
     assert hub.manager.store.load_jobs() == [] and hub.manager.store.load_courses() == []
@@ -317,7 +317,7 @@ def test_local_app_purge_never_deletes_the_users_own_files(tmp_path):
         manager.jobs[job.id] = job
         manager.save_job(job)
         service.delete_course(manager, course["id"])
-        assert manager.purge_deleted(now=time.time() + 31 * 86400) == 1
+        assert manager.trash.purge_deleted(now=time.time() + 31 * 86400) == 1
         assert (vault / "notes.md").read_text(encoding="utf-8") == "笔记"  # 只清理记录
         assert manager.store.load_jobs() == [] and manager.store.load_courses() == []
     finally:
