@@ -133,13 +133,13 @@ def get_course(manager: JobManager, course_id: str, user: User = LOCAL_USER, inc
 
 
 def list_jobs(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
-    with manager._lock:
+    with manager.locked():
         jobs = [job for job in manager.jobs.values() if visible(user, job.owner) and job.deleted_at is None]
     return [job.snapshot(0) for job in jobs]
 
 
 def list_courses(manager: JobManager, user: User = LOCAL_USER) -> list[dict]:
-    with manager._lock:
+    with manager.locked():
         courses = [
             course
             for course in manager.courses.values()
@@ -181,7 +181,7 @@ def delete_job(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> dic
 
 
 def list_trash(manager: JobManager, user: User = LOCAL_USER) -> dict:
-    with manager._lock:
+    with manager.locked():
         courses = [c for c in manager.courses.values() if c.get("deleted_at") and visible(user, c.get("owner"))]
         jobs = [j for j in manager.jobs.values() if j.deleted_at is not None and visible(user, j.owner)]
     hidden = {course["id"] for course in courses}
@@ -271,7 +271,7 @@ def refresh_course(manager: JobManager, course_id: str, body: dict, user: User =
 
 
 def create_job(manager: JobManager, body: dict, user: User = LOCAL_USER) -> dict:
-    with manager._lock:
+    with manager.locked():
         return _create_job_locked(manager, body, user)
 
 
@@ -774,7 +774,7 @@ def cancel_job(manager: JobManager, job_id: str, user: User = LOCAL_USER) -> dic
     job = get_job(manager, job_id, user)
     _request_cancel(manager, job)
     job.log("收到取消请求")
-    manager._save(job)
+    manager.save_job(job)
     return {"ok": True}
 
 
@@ -807,7 +807,7 @@ def rerun_job(manager: JobManager, job_id: str, body: dict, user: User = LOCAL_U
     from_stage = body.get("from_stage") or "organize"
     if from_stage not in STAGE_ORDER:
         raise ValueError(f"from_stage 可选 {', '.join(STAGE_ORDER)}")
-    with manager._lock:
+    with manager.locked():
         if job.status in ACTIVE_STATUSES:
             raise ValueError(f"「{job.title}」正在整理中，请等待当前任务完成")
         if job.options is None:
@@ -917,10 +917,10 @@ def restore_note_version(manager: JobManager, job_id: str, version: int, user: U
     brief = versions.text(job_id, version, "brief")
     if brief is not None and job.result.brief_notes:
         job.result.brief_notes.write_text(brief, encoding="utf-8", newline="")
-    with job._lock:
+    with job.locked():
         job.revision += 1
-        manager._record_version(job, f"恢复到第 {version} 版")
-        manager._save(job)
+        manager.record_version(job, f"恢复到第 {version} 版")
+        manager.save_job(job)
     return {"job": job.snapshot(0)}
 
 
@@ -1091,23 +1091,15 @@ def delete_local_node(manager: JobManager, node_id: str, user: User = LOCAL_USER
 def _peer_store(manager: JobManager):
     from .transfer import TransferPeerStore
 
-    with manager._lock:
-        store = getattr(manager, "_transfer_peers", None)
-        if store is None:
-            store = TransferPeerStore(manager.data_dir / "hub-peers.json", cipher=manager.store.cipher)
-            manager._transfer_peers = store  # type: ignore[attr-defined]
-        return store
+    return manager.shared(
+        "transfer-peers",
+        lambda: TransferPeerStore(manager.data_dir / "hub-peers.json", cipher=manager.store.cipher),
+    )
 
 
 def _local_origins(manager: JobManager) -> set[str]:
     links = getattr(manager, "hub_links", None)
-    raw = getattr(links, "_local_origins", None) or set()
-    origins: set[str] = set()
-    for item in raw:
-        if isinstance(item, tuple) and len(item) == 3:
-            scheme, host, port = item
-            origins.add(f"{scheme}://{host}:{port}")
-    return origins
+    return links.local_origin_urls() if links is not None else set()
 
 
 def _resolve_remote_target(manager: JobManager, body: dict[str, Any], user: User) -> tuple[str, str, str]:
@@ -1171,7 +1163,7 @@ def export_course_bundle_file(
     from ..jobs.bundle import export_bundle
 
     course = get_course(manager, course_id, user)
-    with manager._lock:
+    with manager.locked():
         owned_jobs = [
             job
             for job in manager.jobs.values()
@@ -1318,7 +1310,7 @@ def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
             groups.append((course, jobs))
     elif course_id:
         course = get_course(manager, course_id, user)
-        with manager._lock:
+        with manager.locked():
             jobs = [
                 job
                 for job in manager.jobs.values()

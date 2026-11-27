@@ -201,7 +201,7 @@ def test_purge_job_allows_object_gc(tmp_path):
     try:
         job = Job("j1", "x", "x", tmp_path / "out")
         manager.jobs[job.id] = job
-        manager._save(job)
+        manager.save_job(job)
         tid = manager.queue.enqueue(job.id, "proofread", {"options": {}, "inputs": None})
         manager.queue.claim("w", set())
         digest = manager.queue.complete(tid, "w", {"data": 1})

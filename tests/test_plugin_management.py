@@ -31,9 +31,14 @@ def distribution(name="course2md-demo"):
     )
 
 
+def _fake_manager() -> SimpleNamespace:
+    lock = threading.RLock()
+    return SimpleNamespace(mode="local", jobs={}, _lock=lock, locked=lambda: lock)
+
+
 @pytest.fixture
 def management(monkeypatch):
-    manager = SimpleNamespace(mode="local", jobs={}, _lock=threading.RLock())
+    manager = _fake_manager()
     installed = []
     calls = []
     staged = [distribution()]
@@ -244,7 +249,7 @@ def test_real_wheel_install_load_and_delete_in_isolated_environment(tmp_path, mo
     monkeypatch.setattr(plugins.sys, "executable", str(python))
     monkeypatch.setenv("UV_OFFLINE", "1")
     monkeypatch.delenv("UV_CACHE_DIR", raising=False)
-    manager = SimpleNamespace(mode="local", jobs={}, _lock=threading.RLock())
+    manager = _fake_manager()
     result = plugins.install_plugin(manager, str(wheel), "local")
     assert any(item["name"] == "course2md-demo" for item in result["plugins"])
     loaded = subprocess.run(

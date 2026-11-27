@@ -181,7 +181,7 @@ def export_bundle(
     if not jobs:
         raise ValueError("没有可导出或传输的课次产物")
     for job in jobs:
-        with job._lock:
+        with job.locked():
             if job.status in ACTIVE_STATUSES or job.pending_messages:
                 raise ValueError(f"课次「{job.title}」正在处理中，请等待完成后再导出或传输")
             if not job.out_dir.is_dir():
@@ -199,7 +199,7 @@ def export_bundle(
         with zipfile.ZipFile(tmp_name, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for index, job in enumerate(jobs):
                 key = f"job-{index}"
-                with job._lock:
+                with job.locked():
                     out_dir = job.out_dir.resolve()
                     job_source = public_source(job.source) if job.source else ""
                     serialized_options: dict[str, Any] | None = None
@@ -393,7 +393,7 @@ def _match_course(
 ) -> dict[str, Any]:
     title = str(course_meta.get("course") or course_meta.get("title") or fallback_title or "导入课程").strip()
     incoming_source = str(course_meta.get("source") or "").strip()
-    with manager._lock:
+    with manager.locked():
         owned = [item for item in manager.courses.values() if item.get("owner") == owner and not item.get("deleted_at")]
         # 优先匹配同公开来源且同名课程；其次匹配同根目录同名课程
         for candidate in owned:
@@ -460,7 +460,7 @@ def _find_conflicting_job(
     target_dir: Path,
 ) -> Job | None:
     resolved_target = target_dir.resolve()
-    with manager._lock:
+    with manager.locked():
         for job in manager.jobs.values():
             if job.owner != owner or job.deleted_at is not None:
                 continue
@@ -472,7 +472,7 @@ def _find_conflicting_job(
 
 
 def _allocate_copy_dir(manager: JobManager, parent: Path, base_name: str, root: Path) -> Path:
-    with manager._lock:
+    with manager.locked():
         occupied = {job.out_dir.resolve() for job in manager.jobs.values()}
     for index in range(2, 1000):
         candidate = (parent / f"{base_name}-{index}").resolve()
@@ -842,8 +842,8 @@ def import_bundle(
             job.files = _collect_files(result)
             job.log(f"已从{origin_label}导入")
 
-            with manager._lock:
-                manager._save(job, replace_existing=True)
+            with manager.locked():
+                manager.save_job(job, replace_existing=True)
                 manager.jobs[job.id] = job
 
             if stage_items:
@@ -879,7 +879,7 @@ def import_bundle(
                         )
                         restored_versions += 1
                 if restored_versions == 0 and result.detailed_notes and result.detailed_notes.is_file():
-                    manager._record_version(job, f"从{origin_label}导入")
+                    manager.record_version(job, f"从{origin_label}导入")
 
             _merge_course_session(course, job)
             snap = job.snapshot(0)
@@ -890,7 +890,7 @@ def import_bundle(
 
         if imported_jobs or overwritten_jobs:
             course["updated_at"] = time.time()
-            with manager._lock:
+            with manager.locked():
                 manager.store.save_course(course)
                 manager.courses[course["id"]] = course
             course_payload = manager.course_snapshot(course)

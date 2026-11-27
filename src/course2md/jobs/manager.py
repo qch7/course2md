@@ -11,9 +11,11 @@ import threading
 import time
 import traceback
 import uuid
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from markdown_it import MarkdownIt
 
@@ -48,6 +50,9 @@ FORMATS = ("srt", "vtt", "txt", "md", "json")
 
 def _markdown_html(text: str) -> str:
     return MarkdownIt("commonmark", {"html": False}).disable("image").render(text)
+
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -101,6 +106,10 @@ class Job:
         if key not in self._html_cache:
             self._html_cache[key] = _markdown_html(message["text"])
         return self._html_cache[key]
+
+    def locked(self) -> AbstractContextManager[bool]:
+        """持有任务状态的锁；跨模块修改任务字段必须走它，不要直接访问 ``_lock``。"""
+        return self._lock
 
     def log(self, text: str) -> None:
         with self._lock:
@@ -298,6 +307,7 @@ class JobManager:
         self._lock = threading.RLock()
         self._closing = threading.Event()
         self._pending: dict[str, list] = {}
+        self._shared: dict[str, Any] = {}
         self._runners: dict[str, threading.Thread] = {}
         data_dir = store_path.parent if store_path else Path(default_out_dir()).expanduser().resolve() / ".course2md"
         if database_url:
@@ -350,6 +360,23 @@ class JobManager:
         self._janitor = threading.Thread(target=self._purge_loop, daemon=True)
         self._janitor.start()
 
+    def locked(self) -> AbstractContextManager[bool]:
+        """持有管理器级的锁，保护 ``jobs`` / ``courses`` 两张表。
+
+        锁顺序：先管理器锁，后任务锁；反过来会死锁。外部模块只通过这个方法获取，不要访问 ``_lock``。
+        """
+        return self._lock
+
+    def shared(self, key: str, factory: Callable[[], T]) -> T:
+        """取得按键缓存的共享对象，首次访问时创建。
+
+        给上层（Hub）挂接自己的存储用：``jobs`` 层不能导入 ``hub``，又需要让同一个实例随管理器存活。
+        """
+        with self._lock:
+            if key not in self._shared:
+                self._shared[key] = factory()
+            return cast(T, self._shared[key])
+
     @property
     def builtin_worker(self) -> WorkerRunner | None:
         """内置节点的运行器；节点被停用或本实例没有本机节点时为 None。"""
@@ -360,9 +387,9 @@ class JobManager:
     # ------------------------------------------------------------ 回收站
     def mark_job_deleted(self, job: Job, when: float | None) -> None:
         """移入（when 为时间戳）或移出（None）回收站。"""
-        with job._lock:
+        with job.locked():
             job.deleted_at = when
-        self._save(job)
+        self.save_job(job)
 
     def mark_course_deleted(self, course: dict, when: float | None) -> None:
         with self._lock:
@@ -459,7 +486,7 @@ class JobManager:
         job.active_operation = "pipeline"
         job.messages.append({"id": uuid.uuid4().hex, "role": "user", "text": f"整理课程 {job.title}", "status": "done"})
         with self._lock:
-            self._save(job, replace_existing=True)
+            self.save_job(job, replace_existing=True)
             self.jobs[job.id] = job
         self._queue.put((job, options))
         return job
@@ -541,10 +568,10 @@ class JobManager:
         if self._worker.is_alive():
             print("后台请求尚在退出，已停止课程服务。")
         for job in list(self.jobs.values()):
-            self._save(job)
+            self.save_job(job)
 
     def send(self, job: Job, text: str, request_id: str) -> None:
-        with job._lock:
+        with job.locked():
             if any(message["id"] == request_id for message in job.messages):
                 return
             if not job.snapshot()["can_chat"]:
@@ -555,11 +582,11 @@ class JobManager:
                 job.active_operation = "chat"
                 job.status, job.stage, job.message = "queued", "对话", "修改要求已排队"
                 job.cancel.clear()
-            self._save(job)
+            self.save_job(job)
             self._queue.put((job, ChatRequest(request_id, text)))
 
-    def _save(self, job: Job, replace_existing: bool = False) -> None:
-        with job._lock:
+    def save_job(self, job: Job, replace_existing: bool = False) -> None:
+        with job.locked():
             data = {
                 item.name: getattr(job, item.name)
                 for item in fields(Job)
@@ -660,21 +687,21 @@ class JobManager:
             job.options = options
             if job.cancel.is_set():
                 job.status, job.message = "cancelled", "已取消"
-                self._save(job)
+                self.save_job(job)
                 continue
             job.status = "running"
             job.log("开始执行")
-            self._save(job)
+            self.save_job(job)
 
             def progress(stage, fraction, message, sub=None, job=job):
-                with job._lock:
+                with job.locked():
                     job.stage, job.progress, job.sub, job.message = stage, max(0.0, min(1.0, fraction)), sub, message
                     scale = sub if sub is not None else job.progress
                     bucket = (stage, int(scale * 10))
                     if message and bucket != job._log_bucket:
                         job._log_bucket = bucket
                         job.log(f"{stage} · {message}")
-                        self._save(job)
+                        self.save_job(job)
 
             try:
                 # 阶段经任务队列交给节点执行；内置 Worker 复用已加载的转写模型。
@@ -697,7 +724,7 @@ class JobManager:
                 job.revision += 1
             except Suspended:
                 job.status, job.stage, job.message = "queued", "恢复", "等待服务重启后继续"
-                self._save(job)
+                self.save_job(job)
                 continue
             except Exception as exc:  # noqa: BLE001  产物提取失败由该任务展示，队列继续服务后续课程。
                 self._failure(job, exc)
@@ -713,10 +740,10 @@ class JobManager:
             job.log(job.message)
             for warning in result.warnings:
                 job.log(warning)
-            self._record_version(job, "整理")
-            self._save(job)
+            self.record_version(job, "整理")
+            self.save_job(job)
 
-    def _record_version(self, job: Job, label: str) -> None:
+    def record_version(self, job: Job, label: str) -> None:
         versions = getattr(self, "versions", None)
         if versions is None or not job.result or not job.result.detailed_notes:
             return
@@ -727,13 +754,13 @@ class JobManager:
             job.log(f"笔记版本保存失败：{exc}")
 
     def _failure(self, job: Job, exc: Exception) -> None:
-        with job._lock:
+        with job.locked():
             job.status = "cancelled" if job.cancel.is_set() else "failed"
             job.error = "已取消" if job.cancel.is_set() else str(exc) or type(exc).__name__
             job.message = job.error
             job.log(job.error)
             job.log(traceback.format_exc(limit=4))
-            self._save(job)
+            self.save_job(job)
 
     def _chat(self, job: Job, request: ChatRequest) -> None:
         from ..refine.conversation import continue_notes
@@ -741,7 +768,7 @@ class JobManager:
         from ..stages.base import StageContext
         from ..stages.chat import ChatStage
 
-        with job._lock:
+        with job.locked():
             job.active_operation = "chat"
             job.pending_messages -= 1
             current = next(message for message in job.messages if message["id"] == request.id)
@@ -756,9 +783,9 @@ class JobManager:
                 raise ValueError("本轮对话已取消")
             if not job.result or not job.result.note_workspace or not job.result.detailed_notes or job.options is None:
                 raise ValueError("提取尚未成功，请完成课程整理后重新发送要求")
-            with job._lock:
+            with job.locked():
                 job.status, job.stage, job.message, job.error = "running", "对话", "正在处理你的要求", ""
-                self._save(job)
+                self.save_job(job)
             if getattr(self, "queue", None):
                 inputs = ChatInput(
                     job.result.note_workspace,
@@ -791,16 +818,16 @@ class JobManager:
             job.files = _collect_files(job.result)
             if reply.updated:
                 job.revision += 1
-                self._record_version(job, f"对话：{request.text[:40]}")
+                self.record_version(job, f"对话：{request.text[:40]}")
         except Suspended:
-            with job._lock:
+            with job.locked():
                 current["status"] = "queued"
                 job.pending_messages += 1
                 job.status, job.stage, job.message = "queued", "恢复", "等待服务重启后继续对话"
-            self._save(job)
+            self.save_job(job)
             return
         except Exception as exc:  # noqa: BLE001  本轮错误保留已有笔记，课程保持可用，后续对话仍可重试。
-            with job._lock:
+            with job.locked():
                 cancelled = job.cancel.is_set()
                 text = "本轮对话已取消" if cancelled else str(exc) or type(exc).__name__
                 job.log(text)
@@ -818,7 +845,7 @@ class JobManager:
                     {"id": uuid.uuid4().hex, "role": "assistant", "text": text, "status": current["status"]}
                 )
         else:
-            with job._lock:
+            with job.locked():
                 current["status"] = "done"
                 job.status, job.stage, job.message = "done", "完成", "两版笔记已更新" if reply.updated else "回复完成"
                 job.messages.append(
@@ -830,7 +857,7 @@ class JobManager:
                         "updated": reply.updated,
                     }
                 )
-        self._save(job)
+        self.save_job(job)
 
 
 def _collect_files(result) -> list[dict[str, str]]:

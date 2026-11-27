@@ -213,7 +213,7 @@ def _seed_completed_job(
     )
     job.files = _collect_files(result)
     manager.jobs[job.id] = job
-    manager._save(job, replace_existing=True)
+    manager.save_job(job, replace_existing=True)
 
     # 记录两个笔记版本
     manager.versions.import_version(job.id, b"# v1 detailed\n", b"# v1 brief\n", "整理", "gpt-5", created_at=1000.0)

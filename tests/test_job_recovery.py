@@ -44,7 +44,7 @@ def test_restart_reconnects_to_existing_stage_instead_of_enqueuing_duplicate(tmp
     key = cache_key("output", payload["options"], None)
     task = manager.queue.enqueue(job.id, "output", payload, cache_key=key)
     manager.jobs[job.id] = job
-    manager._save(job)
+    manager.save_job(job)
     manager.close()
     finished = threading.Event()
 

@@ -222,7 +222,7 @@ def _finished_course(hub, owner_id):  # noqa: F811
         status="done",
     )
     hub.manager.jobs[job.id] = job
-    hub.manager._save(job)
+    hub.manager.save_job(job)
     return course, job
 
 
@@ -315,7 +315,7 @@ def test_local_app_purge_never_deletes_the_users_own_files(tmp_path):
             id="job1", source="x", title="第一讲", out_dir=vault, course_id=course["id"], owner="local", status="done"
         )
         manager.jobs[job.id] = job
-        manager._save(job)
+        manager.save_job(job)
         service.delete_course(manager, course["id"])
         assert manager.purge_deleted(now=time.time() + 31 * 86400) == 1
         assert (vault / "notes.md").read_text(encoding="utf-8") == "笔记"  # 只清理记录

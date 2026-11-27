@@ -565,7 +565,7 @@ def test_all_job_states_and_custom_output_survive_restart(tmp_path, monkeypatch)
             job.result = JobResult(output_dir=folder)
         job.log("已保存的进度")
         job.emit({"kind": "assistant", "text": "已保存的输出"})
-        manager._save(job)
+        manager.save_job(job)
 
     assert "secret-for-test" not in json.dumps(manager.store.load_jobs())
     monkeypatch.setattr(server.JobManager, "_dispatch", lambda self: None)
@@ -594,7 +594,7 @@ def test_replacing_job_also_replaces_persisted_record(web, monkeypatch):
     previous.status = "done"
     status, _, body = web.request("POST", "/api/v1/jobs", payload)
     assert status == 200
-    web.manager._save(previous)
+    web.manager.save_job(previous)
     assert [item["id"] for item in web.manager.store.load_jobs()] == [json.loads(body)["id"]]
 
 
