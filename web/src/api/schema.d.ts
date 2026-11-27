@@ -553,6 +553,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/local-nodes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 本机节点及其能力 */
+    get: operations["list_local_nodes_api_v1_local_nodes_get"];
+    put?: never;
+    /** 创建本机节点 */
+    post: operations["create_local_node_api_v1_local_nodes_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/local-nodes/{node_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 删除本机节点（内置节点除外） */
+    delete: operations["delete_local_node_api_v1_local_nodes__node_id__delete"];
+    options?: never;
+    head?: never;
+    /** 修改本机节点名称、能力或启停 */
+    patch: operations["update_local_node_api_v1_local_nodes__node_id__patch"];
+    trace?: never;
+  };
   "/api/v1/plugins": {
     parameters: {
       query?: never;
@@ -2051,6 +2087,139 @@ export interface components {
        * @default []
        */
       jobs: components["schemas"]["Job"][];
+    } & {
+      [key: string]: unknown;
+    };
+    /** LocalNode */
+    LocalNode: {
+      /**
+       * Auto
+       * @default true
+       */
+      auto: boolean;
+      /**
+       * Builtin
+       * @default false
+       */
+      builtin: boolean;
+      /**
+       * Busy
+       * @default false
+       */
+      busy: boolean;
+      /**
+       * Capabilities
+       * @default []
+       */
+      capabilities: string[];
+      /**
+       * Created At
+       * @default 0
+       */
+      created_at: number;
+      /** Current Task */
+      current_task?: string | null;
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean;
+      /** Id */
+      id: string;
+      /**
+       * Name
+       * @default
+       */
+      name: string;
+      /**
+       * Online
+       * @default false
+       */
+      online: boolean;
+      /**
+       * Selected
+       * @default []
+       */
+      selected: string[];
+    } & {
+      [key: string]: unknown;
+    };
+    /** LocalNodeCreateRequest */
+    LocalNodeCreateRequest: {
+      /**
+       * Auto
+       * @description 随本机检测结果自动获得全部能力；为 true 时忽略 capabilities
+       * @default false
+       */
+      auto: boolean;
+      /**
+       * Capabilities
+       * @description 节点承担的能力，只能是本机具备能力的子集
+       */
+      capabilities?: string[];
+      /**
+       * Enabled
+       * @description 创建后立即启用
+       * @default true
+       */
+      enabled: boolean;
+      /**
+       * Name
+       * @description 节点名称，留空自动编号
+       * @default
+       */
+      name: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** LocalNodeResponse */
+    LocalNodeResponse: {
+      node: components["schemas"]["LocalNode"];
+    } & {
+      [key: string]: unknown;
+    };
+    /** LocalNodeUpdateRequest */
+    LocalNodeUpdateRequest: {
+      /**
+       * Auto
+       * @description 是否随本机检测结果自动获得全部能力
+       */
+      auto?: boolean | null;
+      /**
+       * Capabilities
+       * @description 节点承担的能力
+       */
+      capabilities?: string[] | null;
+      /**
+       * Enabled
+       * @description 停用后节点离线，不再领取任务
+       */
+      enabled?: boolean | null;
+      /**
+       * Name
+       * @description 节点名称
+       */
+      name?: string | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** LocalNodesResponse */
+    LocalNodesResponse: {
+      /**
+       * Available Capabilities
+       * @default []
+       */
+      available_capabilities: string[];
+      /**
+       * Can Manage
+       * @default false
+       */
+      can_manage: boolean;
+      /**
+       * Nodes
+       * @default []
+       */
+      nodes: components["schemas"]["LocalNode"][];
     } & {
       [key: string]: unknown;
     };
@@ -4379,6 +4548,125 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["JobResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_local_nodes_api_v1_local_nodes_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalNodesResponse"];
+        };
+      };
+    };
+  };
+  create_local_node_api_v1_local_nodes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LocalNodeCreateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalNodeResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_local_node_api_v1_local_nodes__node_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        node_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Ok"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_local_node_api_v1_local_nodes__node_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        node_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LocalNodeUpdateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalNodeResponse"];
         };
       };
       /** @description Validation Error */

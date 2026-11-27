@@ -375,6 +375,30 @@ class HubLinksResponse(_Model):
     default_work_dir: str = ""
 
 
+class LocalNode(_Model):
+    id: str
+    name: str = ""
+    builtin: bool = False
+    enabled: bool = True
+    auto: bool = True
+    selected: list[str] = []
+    capabilities: list[str] = []
+    online: bool = False
+    busy: bool = False
+    current_task: str | None = None
+    created_at: float = 0.0
+
+
+class LocalNodeResponse(_Model):
+    node: LocalNode
+
+
+class LocalNodesResponse(_Model):
+    nodes: list[LocalNode] = []
+    can_manage: bool = False
+    available_capabilities: list[str] = []
+
+
 class TransferSkipped(_Model):
     title: str = ""
     session_id: str = ""

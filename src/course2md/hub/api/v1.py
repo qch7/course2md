@@ -28,6 +28,8 @@ from ..schemas import (
     CreateJobRequest,
     HubLinkCreateRequest,
     HubLinkUpdateRequest,
+    LocalNodeCreateRequest,
+    LocalNodeUpdateRequest,
     MessageRequest,
     PluginInstallRequest,
     RefreshRequest,
@@ -356,6 +358,33 @@ def disconnect_hub_link(link_id: str, request: Request, user: CurrentUser) -> di
 @router.delete("/hub-links/{link_id}", tags=["计算服务"], summary="删除对外连接的远程 Hub", response_model=r.Ok)
 def delete_hub_link(link_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
     return service.delete_hub_link(_manager(request), link_id, user)
+
+
+@router.get("/local-nodes", tags=["计算服务"], summary="本机节点及其能力", response_model=r.LocalNodesResponse)
+def list_local_nodes(request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.list_local_nodes(_manager(request), user)
+
+
+@router.post("/local-nodes", tags=["计算服务"], summary="创建本机节点", response_model=r.LocalNodeResponse)
+def create_local_node(body: LocalNodeCreateRequest, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.create_local_node(_manager(request), body.payload(), user)
+
+
+@router.patch(
+    "/local-nodes/{node_id}",
+    tags=["计算服务"],
+    summary="修改本机节点名称、能力或启停",
+    response_model=r.LocalNodeResponse,
+)
+def update_local_node(
+    node_id: str, body: LocalNodeUpdateRequest, request: Request, user: CurrentUser
+) -> dict[str, Any]:
+    return service.update_local_node(_manager(request), node_id, body.payload(), user)
+
+
+@router.delete("/local-nodes/{node_id}", tags=["计算服务"], summary="删除本机节点（内置节点除外）", response_model=r.Ok)
+def delete_local_node(node_id: str, request: Request, user: CurrentUser) -> dict[str, Any]:
+    return service.delete_local_node(_manager(request), node_id, user)
 
 
 @router.post("/jobs/{job_id}/cancel", tags=["任务"], summary="取消任务", response_model=r.Ok)

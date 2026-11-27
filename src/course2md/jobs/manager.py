@@ -13,6 +13,7 @@ import traceback
 import uuid
 from dataclasses import dataclass, field, fields
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from markdown_it import MarkdownIt
 
@@ -35,6 +36,9 @@ from ..stages.executor import QueueExecutor, Suspended
 from ..storage import LocalFileStore
 from ..util.text import safe_name
 from .storage import WorkspaceStore
+
+if TYPE_CHECKING:
+    from ..worker import LocalNodeManager, WorkerRunner
 
 ACTIVE_STATUSES = ("queued", "running")
 TRASH_SECONDS = 30 * 24 * 3600  # 回收站保留期
@@ -312,23 +316,22 @@ class JobManager:
                 self.warnings.append(f"任务 {data.get('id', '')} 读取失败（{exc}）")
         self.queue = TaskQueue(self.store.db, LocalFileStore(data_dir / "objects"))
         self.versions = NoteVersions(self.store.db, self.queue.store)
-        from ..worker import HubLinkManager, WorkerRunner, detect_capabilities
+        from ..worker import HubLinkManager, LocalNodeManager, detect_capabilities
+        from ..worker.local import BUILTIN_ID
 
         self._worker_resources: dict = {}
         self._worker_exec_lock = threading.Lock()
-        self.builtin_worker = None
+        self.local_nodes: LocalNodeManager | None = None
         if builtin_worker:
-            self.builtin_worker = WorkerRunner(
+            self.local_nodes = LocalNodeManager(
+                data_dir / "local-nodes.json",
                 self.queue,
-                # 服务器形态的 Hub 不承担模型接口调用，校对与整理交给自带密钥或 Agent 的计算节点
-                detect_capabilities(hub=True, llm_api=mode != "server"),
-                worker_id="builtin",
-                name="内置节点",
-                kind="builtin",
-                poll_interval=0.2,
                 resources=self._worker_resources,
                 exec_lock=self._worker_exec_lock,
+                # 服务器形态的 Hub 不承担模型接口调用，校对与整理交给自带密钥或 Agent 的计算节点
+                ceiling=lambda: detect_capabilities(hub=True, llm_api=mode != "server"),
             ).start()
+        self._builtin_id = BUILTIN_ID
         self.hub_links = HubLinkManager(
             data_dir / "hub-links.json",
             resources=self._worker_resources,
@@ -346,6 +349,13 @@ class JobManager:
                         self._queue.put((job, ChatRequest(message["id"], message["text"])))
         self._janitor = threading.Thread(target=self._purge_loop, daemon=True)
         self._janitor.start()
+
+    @property
+    def builtin_worker(self) -> WorkerRunner | None:
+        """内置节点的运行器；节点被停用或本实例没有本机节点时为 None。"""
+        if self.local_nodes is None:
+            return None
+        return self.local_nodes.runner(self._builtin_id)
 
     # ------------------------------------------------------------ 回收站
     def mark_job_deleted(self, job: Job, when: float | None) -> None:
@@ -525,9 +535,9 @@ class JobManager:
         hub_links = getattr(self, "hub_links", None)
         if hub_links is not None:
             hub_links.close()
-        builtin = getattr(self, "builtin_worker", None)
-        if builtin is not None:
-            builtin.stop()
+        local_nodes = getattr(self, "local_nodes", None)
+        if local_nodes is not None:
+            local_nodes.close()
         if self._worker.is_alive():
             print("后台请求尚在退出，已停止课程服务。")
         for job in list(self.jobs.values()):

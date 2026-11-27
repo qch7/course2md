@@ -323,10 +323,11 @@ class TaskQueue:
             row.disabled, row.token_hash, row.last_seen = True, None, 0.0
         return True
 
-    def delete_worker(self, worker_id: str) -> bool:
+    def delete_worker(self, worker_id: str, *, allow_builtin: bool = False) -> bool:
+        """allow_builtin 只给本机节点管理使用：网页的节点接口仍然不能删除进程内节点。"""
         with self.db.session() as session:
             row = session.get(WorkerRow, worker_id)
-            if row is None or row.kind == "builtin":
+            if row is None or (row.kind == "builtin" and not allow_builtin):
                 return False
             active = session.scalar(
                 select(TaskRow.id)

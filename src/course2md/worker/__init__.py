@@ -2,6 +2,14 @@
 
 from .capabilities import detect_capabilities, satisfies
 from .link import HubLinkManager
+from .local import LocalNodeManager
 from .runner import Transport, WorkerRunner
 
-__all__ = ["HubLinkManager", "Transport", "WorkerRunner", "detect_capabilities", "satisfies"]
+__all__ = [
+    "HubLinkManager",
+    "LocalNodeManager",
+    "Transport",
+    "WorkerRunner",
+    "detect_capabilities",
+    "satisfies",
+]
