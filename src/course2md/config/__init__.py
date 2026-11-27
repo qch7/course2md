@@ -34,6 +34,7 @@ __all__ = [
     "env",
     "find_cuda_dirs",
     "find_model",
+    "home_dir",
     "load_config_file",
     "load_env_file",
     "load_settings",
@@ -46,9 +47,11 @@ __all__ = [
 def load_env_file(path: Path | None = None) -> Path | None:
     """读取 .env 并写入 os.environ（已存在的变量不覆盖）。
 
-    查找顺序：显式路径 → 当前工作目录 → 用户配置目录。找不到就静默跳过。
+    查找顺序：显式路径 → 数据根目录（若不同于当前目录）→ 当前工作目录 → 用户配置目录。找不到就静默跳过。
     """
-    candidates = [path] if path else [Path.cwd() / ".env", user_config_dir() / ".env"]
+    candidates = (
+        [path] if path else list(dict.fromkeys([home_dir() / ".env", Path.cwd() / ".env", user_config_dir() / ".env"]))
+    )
     for candidate in candidates:
         if candidate is None or not candidate.is_file():
             continue
@@ -118,7 +121,7 @@ def find_model(name: str | None = None) -> str:
     hf_home = env("HF_HOME")
     if hf_home:
         roots += [Path(hf_home) / "hub", Path(hf_home)]
-    local = Path.cwd() / DEFAULT_HF_CACHE
+    local = home_dir() / DEFAULT_HF_CACHE
     roots += [local / "hub", local, Path.home() / ".cache" / "huggingface" / "hub"]
     for root in roots:
         snapshots = root / repo / "snapshots"
@@ -223,8 +226,18 @@ def default_agent(choice: str | None = None, provider: str | None = None, model:
     return AgentConfig(command=split_command(raw), timeout=timeout, reasoning_effort=effort)
 
 
+def home_dir() -> Path:
+    """数据根目录：``COURSE2MD_HOME``，未设置时是当前目录（保持旧版本的数据位置）。"""
+    configured = env("COURSE2MD_HOME").strip()
+    return Path(configured).expanduser().resolve() if configured else Path.cwd()
+
+
 def default_out_dir() -> str:
-    return env("COURSE2MD_OUT_DIR", "course2md-output")
+    value = env("COURSE2MD_OUT_DIR", "course2md-output")
+    # 只有显式设置了根目录才把相对路径固定下来；否则仍返回原值，由调用处按当前目录解析
+    if env("COURSE2MD_HOME").strip() and not Path(value).expanduser().is_absolute():
+        return str(home_dir() / value)
+    return value
 
 
 def default_worker_dir() -> Path:
@@ -234,7 +247,7 @@ def default_worker_dir() -> Path:
     三处入口（命令行节点、本机 Hub 链接、网页服务）都经过这里，避免各自拼路径。
     """
     configured = env("COURSE2MD_WORKER_DIR").strip()
-    return (Path(configured).expanduser() if configured else Path.cwd() / DEFAULT_WORKER_DIR).resolve()
+    return (Path(configured).expanduser() if configured else home_dir() / DEFAULT_WORKER_DIR).resolve()
 
 
 def default_term_start() -> str:

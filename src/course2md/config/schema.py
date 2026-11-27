@@ -203,6 +203,15 @@ SETTINGS: tuple[Setting, ...] = (
     ),
     Setting("COURSE2MD_DISABLED_RESOLVERS", "resolvers", "disabled", [], "list", "按名称停用的解析器。"),
     # -------------------------------------------------------------- runtime
+    Setting(
+        "COURSE2MD_HOME",
+        "runtime",
+        "home",
+        "",
+        "path",
+        "数据根目录。设置后，相对路径的输出目录、节点工作目录和本地模型缓存都放在它下面；"
+        "留空时相对于启动时的当前目录，与旧版本一致。",
+    ),
     Setting("COURSE2MD_FFMPEG", "runtime", "ffmpeg", "", "path", "ffmpeg 路径；未安装时用 PyAV 解码音频。"),
     Setting("HF_HOME", "runtime", "hf_home", "", "path", "模型缓存目录，留空使用 Hugging Face 默认位置。"),
     Setting("HF_ENDPOINT", "runtime", "hf_endpoint", "", "url", "模型下载镜像。", example="https://hf-mirror.com"),

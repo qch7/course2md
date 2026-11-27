@@ -136,3 +136,26 @@ def test_default_worker_dir_prefers_env_then_cwd(tmp_path, monkeypatch):
 
     monkeypatch.setenv("COURSE2MD_WORKER_DIR", str(tmp_path / "elsewhere"))
     assert default_worker_dir() == (tmp_path / "elsewhere").resolve()
+
+
+def test_home_dir_defaults_to_cwd_and_anchors_relative_paths_when_set(tmp_path, monkeypatch):
+    from course2md.config import default_out_dir, default_worker_dir, home_dir
+
+    monkeypatch.delenv("COURSE2MD_HOME", raising=False)
+    monkeypatch.delenv("COURSE2MD_OUT_DIR", raising=False)
+    monkeypatch.delenv("COURSE2MD_WORKER_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
+    # 未设置时保持旧行为：输出目录仍是相对路径，节点目录在当前目录下
+    assert home_dir() == tmp_path
+    assert default_out_dir() == "course2md-output"
+    assert default_worker_dir() == (tmp_path / "course2md-worker").resolve()
+
+    data = tmp_path / "data"
+    monkeypatch.setenv("COURSE2MD_HOME", str(data))
+    assert default_out_dir() == str(data.resolve() / "course2md-output")
+    assert default_worker_dir() == (data / "course2md-worker").resolve()
+
+    # 显式给出的绝对路径不受根目录影响
+    elsewhere = tmp_path / "elsewhere"
+    monkeypatch.setenv("COURSE2MD_OUT_DIR", str(elsewhere))
+    assert default_out_dir() == str(elsewhere)
