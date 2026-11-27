@@ -65,7 +65,52 @@ def _check_ip(
         )
 
 
-def validate_remote_hub_url(  # noqa: PLR0912  历史遗留的长函数，拆分后移除
+def _reject_self_target(hub_url: str, local_origins: set[str]) -> None:
+    """对端与当前 Hub 同源时直接拒绝，避免自己给自己发请求。"""
+    target_origin = _origin_key(hub_url)
+    for local in local_origins:
+        try:
+            if _origin_key(normalize_hub_url(local)) == target_origin:
+                raise TransferError("不能以当前 Hub 自身作为对端传输目标", status_code=400)
+        except ValueError:
+            continue
+
+
+def _check_resolved_host(host: str, port: int, *, allow_private: bool) -> None:
+    """域名解析出的每个地址都要过 _check_ip，防止域名指向内网地址绕过限制。"""
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise TransferError(f"无法解析对端 Hub 地址（{host}）：{exc}", status_code=400) from None
+    if not infos:
+        raise TransferError(f"无法解析对端 Hub 地址（{host}）", status_code=400) from None
+    for info in infos:
+        sockaddr = info[4]
+        if not sockaddr:
+            continue
+        try:
+            resolved = ipaddress.ip_address(str(sockaddr[0]).split("%", 1)[0])
+        except ValueError:
+            continue
+        _check_ip(resolved, allow_private=allow_private)
+
+
+def _check_server_mode_target(hub_url: str, *, is_admin: bool) -> None:
+    """服务器形态下的 SSRF 检查：字面 IP 直接校验，域名则校验其全部解析结果。"""
+    parsed = urlparse(hub_url)
+    host = (parsed.hostname or "").strip()
+    allow_private = is_admin or env("COURSE2MD_ALLOW_PRIVATE_TRANSFER").strip().lower() in TRUE_WORDS
+    try:
+        literal_ip = ipaddress.ip_address(host)
+    except ValueError:
+        _check_resolved_host(
+            host, parsed.port or (443 if parsed.scheme == "https" else 80), allow_private=allow_private
+        )
+    else:
+        _check_ip(literal_ip, allow_private=allow_private)
+
+
+def validate_remote_hub_url(
     raw_url: str,
     *,
     server_mode: bool = False,
@@ -79,40 +124,10 @@ def validate_remote_hub_url(  # noqa: PLR0912  历史遗留的长函数，拆分
         raise TransferError(str(exc), status_code=400) from None
 
     if local_origins:
-        target_origin = _origin_key(hub_url)
-        for local in local_origins:
-            try:
-                if _origin_key(normalize_hub_url(local)) == target_origin:
-                    raise TransferError("不能以当前 Hub 自身作为对端传输目标", status_code=400)
-            except ValueError:
-                continue
+        _reject_self_target(hub_url, local_origins)
 
     if server_mode:
-        parsed = urlparse(hub_url)
-        host = (parsed.hostname or "").strip()
-        allow_private = is_admin or env("COURSE2MD_ALLOW_PRIVATE_TRANSFER").strip().lower() in TRUE_WORDS
-        try:
-            literal_ip = ipaddress.ip_address(host)
-        except ValueError:
-            try:
-                infos = socket.getaddrinfo(
-                    host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM
-                )
-            except OSError as exc:
-                raise TransferError(f"无法解析对端 Hub 地址（{host}）：{exc}", status_code=400) from None
-            if not infos:
-                raise TransferError(f"无法解析对端 Hub 地址（{host}）", status_code=400) from None
-            for info in infos:
-                sockaddr = info[4]
-                if not sockaddr:
-                    continue
-                try:
-                    resolved = ipaddress.ip_address(str(sockaddr[0]).split("%", 1)[0])
-                except ValueError:
-                    continue
-                _check_ip(resolved, allow_private=allow_private)
-        else:
-            _check_ip(literal_ip, allow_private=allow_private)
+        _check_server_mode_target(hub_url, is_admin=is_admin)
 
     return hub_url
 

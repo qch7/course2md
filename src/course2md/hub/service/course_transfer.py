@@ -209,16 +209,10 @@ def remote_catalog(manager: JobManager, body: dict[str, Any], user: User = LOCAL
         return remote.catalog()
 
 
-def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_USER) -> dict[str, Any]:  # noqa: PLR0915  历史遗留的长函数，拆分后移除
-    from ...jobs.bundle import CONFLICT_MODES, export_bundle
-    from ..transfer import RemoteHubClient
-
-    hub_url, token, _ = _resolve_remote_target(manager, body, user)
-    conflict = str(body.get("conflict") or "skip")
-    if conflict not in CONFLICT_MODES:
-        raise ValueError(f"不支持的冲突处理策略：{conflict!r}，可选 {', '.join(CONFLICT_MODES)}")
-    include_cache = bool(body.get("include_cache", False))
-
+def _collect_push_groups(
+    manager: JobManager, body: dict[str, Any], user: User
+) -> list[tuple[CourseRecord | None, list[Job]]]:
+    """按请求选出要推送的课次，并按所属课程分组（每组打成一个产物包）。"""
     raw_job_ids = body.get("job_ids")
     course_id = str(body.get("course_id") or "").strip()
 
@@ -254,6 +248,20 @@ def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
         groups.append((course, jobs))
     else:
         raise ValueError("请先选择要推送的课程或课次")
+    return groups
+
+
+def _push_groups(
+    manager: JobManager,
+    hub_url: str,
+    token: str,
+    groups: list[tuple[CourseRecord | None, list[Job]]],
+    conflict: str,
+    include_cache: bool,
+) -> dict[str, Any]:
+    """逐组导出产物包并推给对端，汇总对端返回的课程与导入结果。"""
+    from ...jobs.bundle import export_bundle
+    from ..transfer import RemoteHubClient
 
     courses_by_id: dict[str, dict[str, Any]] = {}
     imported: list[dict[str, Any]] = []
@@ -280,14 +288,26 @@ def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_
             warnings.extend(result.get("warnings") or [])
 
     return {
-        "direction": "push",
-        "hub_url": hub_url,
         "courses": list(courses_by_id.values()),
         "imported": imported,
         "overwritten": overwritten,
         "skipped": skipped,
         "warnings": warnings,
     }
+
+
+def transfer_push(manager: JobManager, body: dict[str, Any], user: User = LOCAL_USER) -> dict[str, Any]:
+    from ...jobs.bundle import CONFLICT_MODES
+
+    hub_url, token, _ = _resolve_remote_target(manager, body, user)
+    conflict = str(body.get("conflict") or "skip")
+    if conflict not in CONFLICT_MODES:
+        raise ValueError(f"不支持的冲突处理策略：{conflict!r}，可选 {', '.join(CONFLICT_MODES)}")
+    include_cache = bool(body.get("include_cache", False))
+
+    groups = _collect_push_groups(manager, body, user)
+    summary = _push_groups(manager, hub_url, token, groups, conflict, include_cache)
+    return {"direction": "push", "hub_url": hub_url, **summary}
 
 
 def transfer_pull(manager: JobManager, body: dict[str, Any], user: User = LOCAL_USER) -> dict[str, Any]:

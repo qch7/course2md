@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from ..errors import Course2mdError
 
@@ -147,7 +148,56 @@ class BaseResolver:
         return []
 
 
-def download(media: MediaRef, dest: Path, progress=None, session=None) -> Path:  # noqa: PLR0912  历史遗留的长函数，拆分后移除
+def _declared_length(resp: Any) -> int | None:
+    """读取 Content-Length；缺失返回 None，格式非法直接报错，避免后面按错误长度校验。"""
+    length = resp.headers.get("Content-Length")
+    if length is not None and not length.isdecimal():
+        raise ResolverError("下载响应的 Content-Length 无效，请重新下载")
+    return int(length) if length is not None else None
+
+
+def _check_resume_range(resp: Any, have: int, response_length: int | None) -> tuple[int | None, int]:
+    """校验 206 的 Content-Range 与本地分片衔接，返回（文件总长度或 None，本次响应应收字节数）。"""
+    match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+|\*)", resp.headers.get("Content-Range", ""))
+    if match is None:
+        raise ResolverError("续传响应缺少有效的 Content-Range，已保留原分片")
+    start, end = int(match[1]), int(match[2])
+    total = int(match[3]) if match[3] != "*" else None
+    if (
+        start != have
+        or end < start
+        or (total is not None and end >= total)
+        or (response_length is not None and response_length != end - start + 1)
+    ):
+        raise ResolverError("续传响应的字节区间不匹配，已保留原分片")
+    return total, end - start + 1
+
+
+def _write_chunks(
+    resp: Any,
+    part: Path,
+    have: int,
+    total: int | None,
+    response_length: int | None,
+    progress: Callable[[int, int], None] | None,
+) -> tuple[int, int]:
+    """把响应体写入分片，返回（分片累计字节数，本次收到字节数）。"""
+    received = 0
+    with part.open("ab" if have else "wb") as handle:
+        for chunk in resp.iter_content(1024 * 512):
+            if not chunk:
+                continue
+            if response_length is not None and received + len(chunk) > response_length:
+                raise ResolverError("下载响应超出声明的字节数，已保留有效分片，请重试下载")
+            handle.write(chunk)
+            have += len(chunk)
+            received += len(chunk)
+            if progress:
+                progress(have, total or have)
+    return have, received
+
+
+def download(media: MediaRef, dest: Path, progress=None, session=None) -> Path:
     """下载到 .part 后提交。200 覆盖旧分片，206 校验区间，失败保留分片。
 
     progress(已下载字节, 总字节) 可选；session 为 requests.Session，省略时临时创建。
@@ -173,39 +223,13 @@ def download(media: MediaRef, dest: Path, progress=None, session=None) -> Path: 
     with response as resp:
         if resp.status_code not in (200, 206):
             raise ResolverError(f"下载失败 HTTP {resp.status_code}")
-        length = resp.headers.get("Content-Length")
-        if length is not None and not length.isdecimal():
-            raise ResolverError("下载响应的 Content-Length 无效，请重新下载")
-        response_length = int(length) if length is not None else None
+        response_length = _declared_length(resp)
         if resp.status_code == 206:
-            match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+|\*)", resp.headers.get("Content-Range", ""))
-            if match is None:
-                raise ResolverError("续传响应缺少有效的 Content-Range，已保留原分片")
-            start, end = int(match[1]), int(match[2])
-            total = int(match[3]) if match[3] != "*" else None
-            if (
-                start != have
-                or end < start
-                or (total is not None and end >= total)
-                or (response_length is not None and response_length != end - start + 1)
-            ):
-                raise ResolverError("续传响应的字节区间不匹配，已保留原分片")
-            response_length = end - start + 1
+            total, response_length = _check_resume_range(resp, have, response_length)
         else:
             have = 0
             total = response_length
-        received = 0
-        with part.open("ab" if have else "wb") as handle:
-            for chunk in resp.iter_content(1024 * 512):
-                if not chunk:
-                    continue
-                if response_length is not None and received + len(chunk) > response_length:
-                    raise ResolverError("下载响应超出声明的字节数，已保留有效分片，请重试下载")
-                handle.write(chunk)
-                have += len(chunk)
-                received += len(chunk)
-                if progress:
-                    progress(have, total or have)
+        have, received = _write_chunks(resp, part, have, total, response_length, progress)
         if (response_length is not None and received != response_length) or (total is not None and have != total):
             raise ResolverError("下载字节数与响应不符，已保留分片，请重试下载")
         if resp.status_code == 206 and total is None:

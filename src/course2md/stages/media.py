@@ -52,54 +52,21 @@ class MediaStage(BaseStage[None, MediaOutput]):
     def model(cls, options: JobOptions) -> str:
         return f"faster-whisper {options.asr.model}"
 
-    def run(self, ctx: StageContext, inputs: None = None) -> MediaOutput:  # noqa: PLR0912, PLR0915  历史遗留的长函数，拆分后移除
+    def run(self, ctx: StageContext, inputs: None = None) -> MediaOutput:
         options = ctx.options
-        progress = ctx.progress
         media_dir = ensure_dir(options.out_dir / "media")
 
-        progress("解析", 0.02, f"解析来源：{public_source(options.source)[:80]}", None)
+        ctx.progress("解析", 0.02, f"解析来源：{public_source(options.source)[:80]}", None)
         resolver = get_resolver(options.source)
         refs = resolver.resolve(options.source, options.session_id, options.views)
         if not refs:
             raise ResolverError("没有解析到任何媒体")
-        progress("解析", 0.06, f"解析到 {len(refs)} 路机位：{', '.join(r.name for r in refs)}", None)
+        ctx.progress("解析", 0.06, f"解析到 {len(refs)} 路机位：{', '.join(r.name for r in refs)}", None)
 
         output = MediaOutput()
         for index, ref in enumerate(refs, 1):
             ctx.check()
-            if ref.is_remote:
-                dest = media_dir / safe_name(ref.name)
-                share = (index - 1) / len(refs)
-                if dest.exists() and dest.stat().st_size > 0:
-                    progress("下载", 0.08 + 0.22 * index / len(refs), f"已存在，跳过：{dest.name}", 1.0)
-                else:
-                    progress("下载", 0.08 + 0.22 * share, f"开始下载 {ref.name}", 0.0)
-
-                    def on_bytes(have: int, total: int, ref: MediaRef = ref, share: float = share) -> None:
-                        ratio = min(1.0, have / total) if total else 0.0
-                        progress(
-                            "下载",
-                            0.08 + 0.22 * (share + ratio / len(refs)),
-                            f"{ref.name}  {have / 1048576:.0f} / {total / 1048576:.0f} MB",
-                            ratio,
-                        )
-
-                    import requests
-
-                    with requests.Session() as http:
-                        download(ref, dest, progress=on_bytes, session=http)
-            else:
-                dest = Path(ref.url)
-            output.files.append(
-                MediaFile(
-                    path=dest,
-                    name=ref.name,
-                    remote=ref.is_remote,
-                    view=ref.view,
-                    primary=bool(getattr(ref, "primary", False)),
-                    meta=dict(ref.meta),
-                )
-            )
+            output.files.append(_fetch_media_file(ctx, media_dir, ref, index, len(refs)))
 
         if self.backend is None or self.backend.cfg != options.asr:
             self.backend = WhisperBackend(options.asr)
@@ -107,52 +74,101 @@ class MediaStage(BaseStage[None, MediaOutput]):
         total = len(output.files)
         for index, media in enumerate(output.files, 1):
             ctx.check()
-            base = (index - 1) / total
-            span = 1.0 / total
-            progress("音频", 0.30 + base * 0.04, f"抽取音频：{media.path.name}", None)
-            wav_path = options.out_dir / "audio" / f"{safe_name(media.path.stem)}.wav"
-            wav: Path | None = None
-            try:
-                wav, duration = audio_mod.prepare(media.path, wav_path)
-                if duration < 5:
-                    ctx.warn(f"{media.path.name} 音频过短（{duration:.1f}s），跳过")
-                    continue
-
-                def on_backend(fraction: float, message: str, base: float = base, span: float = span) -> None:
-                    progress("转写", 0.34 + base * 0.22 + fraction * span * 0.22, message, fraction)
-
-                backend.progress = on_backend
-                backend.check_cancel = ctx.check
-                try:
-                    segments = backend.transcribe(audio_mod.read_wav(wav))
-                finally:
-                    backend.check_cancel = None
-            finally:
-                if wav is not None and not options.keep_audio:
-                    wav.unlink(missing_ok=True)
-            stem = safe_name(media.path.stem)
-            output.transcripts.append(
-                Transcript(
-                    stem=stem,
-                    media=media,
-                    duration=duration,
-                    segments=segments,
-                    meta={
-                        "课程": str(media.meta.get("subject") or stem),
-                        "节次": str(media.meta.get("begin") or media.path.stem),
-                        "时长": hhmmss(duration),
-                        "机位": str(media.view or 1),
-                        "转写": f"faster-whisper {options.asr.model}（{options.asr.device}）",
-                    },
-                )
-            )
-        audio_dir = options.out_dir / "audio"
-        if not options.keep_audio and audio_dir.is_dir():
-            try:
-                audio_dir.rmdir()
-            except OSError:
-                pass
+            transcript = _transcribe_media(ctx, backend, media, index, total)
+            if transcript is not None:
+                output.transcripts.append(transcript)
+        _remove_empty_audio_dir(options.out_dir / "audio", options.keep_audio)
         return output
+
+
+def _fetch_media_file(ctx: StageContext, media_dir: Path, ref: MediaRef, index: int, count: int) -> MediaFile:
+    """远程机位下载到 media 目录（已存在则跳过），本地机位直接引用原路径。"""
+    progress = ctx.progress
+    if ref.is_remote:
+        dest = media_dir / safe_name(ref.name)
+        share = (index - 1) / count
+        if dest.exists() and dest.stat().st_size > 0:
+            progress("下载", 0.08 + 0.22 * index / count, f"已存在，跳过：{dest.name}", 1.0)
+        else:
+            progress("下载", 0.08 + 0.22 * share, f"开始下载 {ref.name}", 0.0)
+
+            def on_bytes(have: int, total: int, ref: MediaRef = ref, share: float = share) -> None:
+                ratio = min(1.0, have / total) if total else 0.0
+                progress(
+                    "下载",
+                    0.08 + 0.22 * (share + ratio / count),
+                    f"{ref.name}  {have / 1048576:.0f} / {total / 1048576:.0f} MB",
+                    ratio,
+                )
+
+            import requests
+
+            with requests.Session() as http:
+                download(ref, dest, progress=on_bytes, session=http)
+    else:
+        dest = Path(ref.url)
+    return MediaFile(
+        path=dest,
+        name=ref.name,
+        remote=ref.is_remote,
+        view=ref.view,
+        primary=bool(getattr(ref, "primary", False)),
+        meta=dict(ref.meta),
+    )
+
+
+def _transcribe_media(
+    ctx: StageContext, backend: WhisperBackend, media: MediaFile, index: int, total: int
+) -> Transcript | None:
+    """抽音频并转写一路媒体；音频过短时返回 None。"""
+    options = ctx.options
+    progress = ctx.progress
+    base = (index - 1) / total
+    span = 1.0 / total
+    progress("音频", 0.30 + base * 0.04, f"抽取音频：{media.path.name}", None)
+    wav_path = options.out_dir / "audio" / f"{safe_name(media.path.stem)}.wav"
+    wav: Path | None = None
+    try:
+        wav, duration = audio_mod.prepare(media.path, wav_path)
+        if duration < 5:
+            ctx.warn(f"{media.path.name} 音频过短（{duration:.1f}s），跳过")
+            return None
+
+        def on_backend(fraction: float, message: str, base: float = base, span: float = span) -> None:
+            progress("转写", 0.34 + base * 0.22 + fraction * span * 0.22, message, fraction)
+
+        backend.progress = on_backend
+        backend.check_cancel = ctx.check
+        try:
+            segments = backend.transcribe(audio_mod.read_wav(wav))
+        finally:
+            backend.check_cancel = None
+    finally:
+        if wav is not None and not options.keep_audio:
+            wav.unlink(missing_ok=True)
+    stem = safe_name(media.path.stem)
+    return Transcript(
+        stem=stem,
+        media=media,
+        duration=duration,
+        segments=segments,
+        meta={
+            "课程": str(media.meta.get("subject") or stem),
+            "节次": str(media.meta.get("begin") or media.path.stem),
+            "时长": hhmmss(duration),
+            "机位": str(media.view or 1),
+            "转写": f"faster-whisper {options.asr.model}（{options.asr.device}）",
+        },
+    )
+
+
+def _remove_empty_audio_dir(audio_dir: Path, keep_audio: bool) -> None:
+    """清掉转写后留下的空 audio 目录；目录非空（保留了 WAV）时 rmdir 会失败，忽略即可。"""
+    if not keep_audio and audio_dir.is_dir():
+        try:
+            audio_dir.rmdir()
+        except OSError:
+            pass
 
 
 def select_primary(transcripts: list[Transcript]) -> Transcript:

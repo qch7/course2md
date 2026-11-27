@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -95,16 +96,43 @@ def _electron_env(cmd: list[str]) -> dict[str, str]:
     return {"ELECTRON_RUN_AS_NODE": "1"} if cmd and Path(cmd[0]).name.lower() == "deepseek harness.exe" else {}
 
 
-def parse_dsh_models(dump: str) -> dict:  # noqa: PLR0912  历史遗留的长函数，拆分后移除
+@dataclass
+class _ProvidersScan:
+    """扫描 llm-pi-ai 插件的 providers 段时的位置状态，换插件块时整体重置。"""
+
+    in_providers: bool = False
+    provider_indent: int | None = None
+    current: str = ""
+
+
+def _scan_provider_line(stripped: str, indent: int, scan: _ProvidersScan, providers: dict[str, list[str]]) -> None:
+    """处理 llm-pi-ai 块中的一行：登记提供商名，或把其下的模型 id 追加进去。"""
+    if stripped == "providers:":
+        scan.in_providers, scan.provider_indent = True, None
+        return
+    if not scan.in_providers:
+        return
+    if scan.provider_indent is None and stripped.endswith(":") and " " not in stripped:
+        scan.provider_indent = indent
+    if indent == scan.provider_indent and stripped.endswith(":"):
+        scan.current = stripped[:-1].strip("'\"")
+        providers.setdefault(scan.current, [])
+    elif scan.provider_indent is not None and indent < scan.provider_indent:
+        scan.in_providers = False
+    elif scan.current and re.match(r"(?:- )?id: ", stripped):
+        model = stripped.split("id:", 1)[1].strip().strip("'\"")
+        if model and model not in providers[scan.current]:
+            providers[scan.current].append(model)
+
+
+def parse_dsh_models(dump: str) -> dict:
     """从 dsh --dump-config 的输出读取默认提供商与模型，以及 llm-pi-ai 中登记的提供商和模型。"""
     result: dict = {"default_provider": "", "default_model": "", "providers": {}}
     block = ""
-    in_providers = False
-    provider_indent = None
-    current = ""
+    scan = _ProvidersScan()
     for raw in dump.splitlines():
         if raw.startswith("- id: "):
-            block, in_providers, provider_indent, current = raw[6:].strip(), False, None, ""
+            block, scan = raw[6:].strip(), _ProvidersScan()
             continue
         stripped = raw.strip()
         if not stripped or stripped.startswith("#"):
@@ -115,22 +143,7 @@ def parse_dsh_models(dump: str) -> dict:  # noqa: PLR0912  历史遗留的长函
             if key in ("provider", "model") and value.strip():
                 result[f"default_{key}"] = value.strip().strip("'\"")
         elif block == "llm-pi-ai":
-            if stripped == "providers:":
-                in_providers, provider_indent = True, None
-                continue
-            if not in_providers:
-                continue
-            if provider_indent is None and stripped.endswith(":") and " " not in stripped:
-                provider_indent = indent
-            if indent == provider_indent and stripped.endswith(":"):
-                current = stripped[:-1].strip("'\"")
-                result["providers"].setdefault(current, [])
-            elif provider_indent is not None and indent < provider_indent:
-                in_providers = False
-            elif current and re.match(r"(?:- )?id: ", stripped):
-                model = stripped.split("id:", 1)[1].strip().strip("'\"")
-                if model and model not in result["providers"][current]:
-                    result["providers"][current].append(model)
+            _scan_provider_line(stripped, indent, scan, result["providers"])
     if result["default_provider"]:
         models = result["providers"].setdefault(result["default_provider"], [])
         if result["default_model"] and result["default_model"] not in models:
