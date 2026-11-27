@@ -22,6 +22,7 @@ from markdown_it import MarkdownIt
 from ..config import (
     default_out_dir,
     default_term_start,
+    default_worker_dir,
 )
 from ..core.queue import TaskQueue
 from ..core.versions import NoteVersions
@@ -347,7 +348,7 @@ class JobManager:
             data_dir / "hub-links.json",
             resources=self._worker_resources,
             exec_lock=self._worker_exec_lock,
-            default_work_dir=Path.cwd() / "course2md-worker",
+            default_work_dir=default_worker_dir(),
         )
         self._worker = threading.Thread(target=self._dispatch, daemon=True)
         self._worker.start()

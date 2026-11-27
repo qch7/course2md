@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from ..config import env
+from ..config import default_worker_dir, env
 from ..core.queue import ClaimedTask
 from .capabilities import detect_capabilities
 from .client import AuthError, HttpTransport, HubError, RemoteWorker
@@ -439,7 +439,7 @@ class HubLinkManager:
         self.state_path = state_path
         self.resources: dict[str, Any] = resources if resources is not None else {}
         self.exec_lock: threading.Lock = exec_lock if exec_lock is not None else threading.Lock()
-        self.default_work_dir = (default_work_dir or (Path.cwd() / "course2md-worker")).resolve()
+        self.default_work_dir = (default_work_dir or default_worker_dir()).resolve()
         self._factory: WorkerFactory = worker_factory or _default_worker_factory
         self._lock = threading.RLock()
         self._local_origins: set[tuple[str, str, int]] = set()

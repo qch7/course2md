@@ -16,6 +16,7 @@ from .schema import SETTINGS, validate_environment
 
 MODEL_REPO = "models--Systran--faster-whisper-{name}"
 DEFAULT_HF_CACHE = "hf-cache"
+DEFAULT_WORKER_DIR = "course2md-worker"
 DEFAULT_LLM_BASE = "https://api.deepseek.com/v1"
 
 __all__ = [
@@ -220,6 +221,16 @@ def default_agent(choice: str | None = None, provider: str | None = None, model:
 
 def default_out_dir() -> str:
     return env("COURSE2MD_OUT_DIR", "course2md-output")
+
+
+def default_worker_dir() -> Path:
+    """节点工作目录：优先 ``COURSE2MD_WORKER_DIR``，否则是当前目录下的 ``course2md-worker``。
+
+    默认值依赖启动目录是为了保持现有部署的数据位置不变；需要固定位置时设置环境变量。
+    三处入口（命令行节点、本机 Hub 链接、网页服务）都经过这里，避免各自拼路径。
+    """
+    configured = env("COURSE2MD_WORKER_DIR").strip()
+    return (Path(configured).expanduser() if configured else Path.cwd() / DEFAULT_WORKER_DIR).resolve()
 
 
 def default_term_start() -> str:
