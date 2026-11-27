@@ -9,7 +9,7 @@ import pytest
 import requests
 
 from course2md.asr.formats import Segment
-from course2md.asr.frames import Frame
+from course2md.frames.sampling import Frame
 from course2md.hub.app import create_app
 from course2md.jobs import manager as server
 from course2md.refine.lesson import NotePair
@@ -22,7 +22,7 @@ from live_server import LiveServer
 
 @pytest.fixture
 def deployment(tmp_path, monkeypatch):
-    from course2md.asr import frames
+    from course2md.frames import sampling as frames
     from course2md.refine import lesson
 
     node_dir = tmp_path / "node"

@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from course2md.asr.frames import Frame
 from course2md.core import Database, TaskQueue
+from course2md.frames.sampling import Frame
 from course2md.stages.artifacts import FrameSet, Notes, TranscriptFiles
 from course2md.stages.base import StageContext
 from course2md.stages.codec import cache_key, encode, options_to_dict

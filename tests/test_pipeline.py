@@ -10,7 +10,7 @@ import pytest
 from course2md import pipeline
 from course2md.agents import AgentConfig
 from course2md.asr.formats import Segment, parse_srt
-from course2md.asr.frames import Frame
+from course2md.frames.sampling import Frame
 from course2md.refine.lesson import NotePair
 from course2md.resolvers.base import MediaRef
 from course2md.stages import Cancelled
@@ -75,7 +75,7 @@ def test_builtin_notes_use_one_audio_timeline(media_pipeline, monkeypatch):
 
 
 def test_agent_uses_primary_audio_and_keeps_frames_from_both_views(media_pipeline, monkeypatch):
-    from course2md.asr import frames
+    from course2md.frames import sampling as frames
     from course2md.refine import lesson
 
     media_pipeline.agent = AgentConfig(command=["fake-agent"])

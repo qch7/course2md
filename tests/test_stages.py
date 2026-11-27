@@ -11,7 +11,7 @@ import pytest
 
 from course2md import pipeline
 from course2md.asr.formats import Segment
-from course2md.asr.frames import Frame
+from course2md.frames.sampling import Frame
 from course2md.refine.lesson import NotePair
 from course2md.resolvers.base import MediaRef
 from course2md.stages import (
@@ -153,7 +153,7 @@ def _fake_media(monkeypatch, tmp_path):
 def test_run_job_sends_every_stage_through_executor(tmp_path, monkeypatch):
     from importlib import import_module
 
-    from course2md.asr import frames
+    from course2md.frames import sampling as frames
     from course2md.refine import lesson
     from course2md.refine.proofread import ProofreadResult
 

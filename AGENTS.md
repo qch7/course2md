@@ -38,7 +38,7 @@ uv run python scripts/export_openapi.py # 改 Hub 接口后重新导出 OpenAPI
 | 节点 | `worker` | 领取并执行阶段任务、能力检测、与 Hub 通信 |
 | 编排 | `pipeline` | 按顺序把阶段交给执行器，写 `job.json` |
 | 阶段 | `stages` | 各阶段实现、阶段注册表、任务选项、产物、执行器、编解码 |
-| 领域 | `export`、`doctor` → `refine` → `asr` | 导出与自检；校对与笔记生成；音频、转写、抽帧 |
+| 领域 | `export`、`doctor` → `refine` → `asr`、`frames` | 导出与自检；校对、笔记生成与读图（`refine/vision`）；音频与转写；抽帧与截图筛选 |
 | 配置 | `config` | 配置 Schema、环境变量、`.env` |
 | 扩展点与存储 | `agents`、`resolvers`、`frame_selectors`、`core` | Agent 预设、来源解析、画面筛选；数据库、队列、账号 |
 | 基础 | `plugins`、`storage`、`util`、`errors` | 插件发现、产物存储、工具函数、业务错误基类 |

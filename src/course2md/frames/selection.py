@@ -10,7 +10,7 @@ from PIL import Image
 
 from ..frame_selectors.api import DEFAULT_SELECTOR, FrameSelector, SelectionOptions
 from ..frame_selectors.registry import create_selector, selected_keys
-from .frames import Frame
+from .sampling import Frame
 
 
 def __getattr__(name: str):

@@ -19,14 +19,14 @@ from jsonschema import ValidationError, validate
 
 from ..agents import AgentConfig, AgentError, AgentOutput, execute_agent
 from ..asr.formats import Segment, merge_paragraphs
-from ..asr.frames import Frame
 from ..config import LlmConfig
 from ..frame_selectors.api import DEFAULT_SELECTOR
+from ..frames.sampling import Frame
 from ..util.text import hhmmss
 from . import prompts
 from .llm import ChatClient, LlmError, parse_json_reply
 from .notes import build_chunks, summarize_chunks
-from .visuals import compact_readings, load_redirects, read_visuals
+from .vision.visuals import compact_readings, load_redirects, read_visuals
 
 Progress = Callable[[float, str], None]
 EXAMPLE_CUE = re.compile(
@@ -306,7 +306,7 @@ def build_note_pair(  # noqa: PLR0915  历史遗留的长函数，拆分后移�
     started = time.perf_counter()
     workspace.mkdir(parents=True, exist_ok=True)
     images = sorted(frames or [], key=lambda frame: frame.ts)
-    from ..asr.selection import select_frames
+    from ..frames.selection import select_frames
 
     def check_cancel() -> None:
         if cancel and cancel.is_set():

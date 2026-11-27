@@ -36,7 +36,7 @@ class FramesStage(BaseStage[list[Transcript], list[FrameSet]]):
         return sorted(set(cls.requires(options) + source_caps))
 
     def run(self, ctx: StageContext, inputs: list[Transcript]) -> list[FrameSet]:
-        from ..asr import frames as frames_mod
+        from ..frames import sampling as frames_mod
         from ..refine.lesson import focus_timestamps
 
         options = ctx.options

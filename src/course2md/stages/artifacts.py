@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ..asr.formats import Segment
-from ..asr.frames import Frame
+from ..frames.sampling import Frame
 from ..resolvers.base import SessionInfo
 
 ARTIFACT_VERSION = 1

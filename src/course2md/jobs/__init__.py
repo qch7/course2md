@@ -5,6 +5,6 @@
 """
 
 from .manager import ACTIVE_STATUSES, ConfirmationRequired, Job, JobManager
-from .storage import WorkspaceStore
+from .workspace_store import WorkspaceStore
 
 __all__ = ["ACTIVE_STATUSES", "ConfirmationRequired", "Job", "JobManager", "WorkspaceStore"]

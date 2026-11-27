@@ -12,8 +12,8 @@ from jsonschema import ValidationError, validate
 
 from ..agents import AgentConfig, AgentError, AgentOutput, execute_agent
 from ..asr.formats import Segment
-from ..asr.frames import Frame
 from ..config import LlmConfig
+from ..frames.sampling import Frame
 from ..util.job_refs import from_job_refs
 from ..util.text import hhmmss
 from .lesson import (
@@ -27,7 +27,7 @@ from .lesson import (
 )
 from .llm import ChatClient, LlmError, parse_json_reply
 from .prompts import LESSON_SYSTEM
-from .visuals import compact_readings, load_redirects, read_visuals
+from .vision.visuals import compact_readings, load_redirects, read_visuals
 
 REPLY_SCHEMA = _object(
     {

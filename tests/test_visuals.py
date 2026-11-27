@@ -10,10 +10,10 @@ from unittest.mock import Mock
 import pytest
 
 from course2md.agents import AgentConfig, AgentError
-from course2md.asr.frames import Frame
 from course2md.config import LlmConfig
+from course2md.frames.sampling import Frame
 from course2md.refine.llm import LlmError
-from course2md.refine.visuals import compact_readings, read_visuals
+from course2md.refine.vision.visuals import compact_readings, read_visuals
 
 
 @pytest.fixture

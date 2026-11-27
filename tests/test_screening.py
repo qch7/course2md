@@ -10,10 +10,10 @@ import pytest
 from PIL import Image
 
 from course2md.agents import AgentConfig
-from course2md.asr.frames import Frame
 from course2md.config import LlmConfig
-from course2md.refine.screening import COLUMNS, TILE_SIZE, Decision, build_sheet, parse_decisions
-from course2md.refine.visuals import read_visuals
+from course2md.frames.sampling import Frame
+from course2md.refine.vision.screening import COLUMNS, TILE_SIZE, Decision, build_sheet, parse_decisions
+from course2md.refine.vision.visuals import read_visuals
 
 
 @pytest.fixture
@@ -156,8 +156,8 @@ def test_sheet_rejects_too_many_tiles(figures, tmp_path):
 
 
 def test_screen_prompt_keeps_blackboard_and_forbids_other_files():
-    from course2md.refine.screening import SCREEN_PROMPT
-    from course2md.refine.visuals import SCREEN_INSTRUCTION
+    from course2md.refine.vision.screening import SCREEN_PROMPT
+    from course2md.refine.vision.visuals import SCREEN_INSTRUCTION
 
     assert "板书" in SCREEN_PROMPT and "也选 read" in SCREEN_PROMPT
     assert "不要查找、打开或读取其他图片和文件" in SCREEN_PROMPT
@@ -209,7 +209,7 @@ def test_failed_batch_stops_the_others(tmp_path):
 
 
 def test_redirects_map_duplicates_to_their_representative(figures, tmp_path):
-    from course2md.refine.visuals import load_redirects
+    from course2md.refine.vision.visuals import load_redirects
 
     figures["f6"].path.write_bytes(figures["f5"].path.read_bytes())  # 与 f5 内容完全相同
     model = Model(
